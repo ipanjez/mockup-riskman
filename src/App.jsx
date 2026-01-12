@@ -223,21 +223,22 @@ const App = () => {
   // 3. Export Excel (Moved after risksList definition)
   const handleExportExcel = () => {
     const headers = ['Kode', 'Risiko', 'Sebab', 'Dampak', 'Status', 'Inherent Level', 'Residual Level', 'Target Level'];
-    const csvContent = "data:text/csv;charset=utf-8;sep=;," 
-        + headers.join(";") + "\n"
-        + risksList.map(r => {
-            return [
-                r.code, 
-                `"${r.desc.replace(/"/g, '""')}"`,
-                `"${r.cause.replace(/"/g, '""')}"`,
-                `"${r.impact.replace(/"/g, '""')}"`,
-                r.status,
-                r.inherent.l * r.inherent.c,
-                r.residual.l * r.residual.c,
-                r.target.l * r.target.c
-            ].join(";");
-        }).join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const rows = risksList.map(r => {
+        return [
+            r.code, 
+            `"${r.desc.replace(/"/g, '""')}"`,
+            `"${r.cause.replace(/"/g, '""')}"`,
+            `"${r.impact.replace(/"/g, '""')}"`,
+            r.status,
+            r.inherent.l * r.inherent.c,
+            r.residual.l * r.residual.c,
+            r.target.l * r.target.c
+        ].join(";");
+    });
+
+    const csvContent = "sep=;\n" + headers.join(";") + "\n" + rows.join("\n");
+    const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
+
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     link.setAttribute("download", `Risk_Data_Admin.csv`);
@@ -263,9 +264,7 @@ const App = () => {
       headers.push(`${label} L`, `${label} C`, `${label} Score`, `${label} Level`);
     });
 
-    const csvContent = "data:text/csv;charset=utf-8;sep=;," 
-        + headers.join(";") + "\n"
-        + risksList.map(r => {
+    const rows = risksList.map(r => {
             // Replicating logic for monitoring
             const monitoring = {
                jan: r.inherent,
@@ -305,9 +304,11 @@ const App = () => {
             });
             
             return row.join(";");
-        }).join("\n");
+    });
         
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = "sep=;\n" + headers.join(";") + "\n" + rows.join("\n");
+    const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
+
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     link.setAttribute("download", `Monitoring_Risiko_2026_Full.csv`);
