@@ -50,17 +50,17 @@ const InfoTooltip = ({ text }) => (
 const generateDummyData = () => {
     const units = ['Departemen Lingkungan Hidup', 'Departemen K3', 'Departemen Operasi', 'Departemen HR', 'Departemen Keuangan', 'Departemen IT'];
     const types = [
-        'OPERASIONAL', 'STRATEGIS', 'PROYEK', 'INDIVIDU',
-        'PROYEK Soda Ash', 'PROYEK Fak-Fak', 'PROYEK NPK-3',
-        'SM PERPOL7 OBVITNAS', 'SM SIMPRO', 'SM ISO27001 SMKI',
-        'SM ISO26000 CSR', 'SM ISO37001 SMAP', 'SM ISO22301 BCMS', 
-        'SM ISO 45001 & PP 50 SMK3', 'SM ISO 37301 SMK', 'SM ISO 14001 SML'
+        'OPERASIONAL', 'INDIVIDU',
+        'ᵖʳᵒʸᵉᵏSoda Ash', 'ᵖʳᵒʸᵉᵏFak-Fak', 'ᵖʳᵒʸᵉᵏNPK-3',
+        'ˢᵐPERPOL7 OBVITNAS', 'ˢᵐSIMPRO', 'ˢᵐISO27001 SMKI',
+        'ˢᵐISO26000 CSR', 'ˢᵐISO37001 SMAP', 'ˢᵐISO22301 BCMS', 
+        'ˢᵐISO 45001 & PP 50 SMK3', 'ˢᵐISO 37301 SMK', 'ˢᵐISO 14001 SML'
     ];
     // Register Risk Statuses
     const registerStatuses = [
         'Draft', 
         'Baru',
-        'Menunggu Approval VP Unit Kerja', 
+        'Menunggu Approval VP/PM Unit Kerja', 
         'Menunggu Approval SVP Unit Kerja', 
         'Menunggu Approval VP MRK', 
         'Menunggu Approval SVP TKMR'
@@ -69,7 +69,7 @@ const generateDummyData = () => {
     const monitoringStatuses = [
         'Berjalan', 
         'Revisi Monitoring', 
-        'Menunggu Approval Monitoring VP Unit Kerja', 
+        'Menunggu Approval Monitoring VP/PM Unit Kerja', 
         'Menunggu Approval Monitoring SVP Unit Kerja',
         'Menunggu Approval Monitoring Staff MRK', 
         'Menunggu Approval Monitoring VP MRK', 
@@ -193,7 +193,7 @@ const App = () => {
   // --- DATA & STATE ---
   const [currentUser, setCurrentUser] = useState({ 
       id: 'User 1', 
-      role: 'Superadmin', // Options: Superadmin, Karyawan, AVP, VP, SVP, PIC SISMEN
+      roles: ['Superadmin'], // Multiple roles support
       name: 'Farhan Jezando', 
       unit: 'Departemen K3', 
       kompartemen: 'Kompartemen Operasi',
@@ -202,9 +202,10 @@ const App = () => {
   
   const [filters, setFilters] = useState({ 
       jenis: 'OPERASIONAL', 
-      periode: '2025', 
-      unit: 'Semua Departemen',
-      chartCategory: 'Sasaran Generik' 
+      periode: 'Semua Periode', 
+      unit: 'Semua Unit Kerja',
+      chartCategory: 'Sasaran Generik',
+      chartGrades: ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'] // All selected by default
   });
   
   const [rawData] = useState(() => generateDummyData());
@@ -212,11 +213,11 @@ const App = () => {
   // Helper to get period options based on Risk Type
   const getPeriodOptions = (type) => {
       if (type === 'INDIVIDU') {
-          return ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12'];
+          return ['Semua Periode', 'M1-2026', 'M2-2026', 'M3-2026', 'M4-2026', 'M5-2026', 'M6-2026', 'M7-2026', 'M8-2026', 'M9-2026', 'M10-2026', 'M11-2026', 'M12-2026'];
       } else if (type === 'OPERASIONAL') {
-          return ['Q1', 'Q2', 'Q3', 'Q4'];
+          return ['Semua Periode', 'Q1-2025', 'Q2-2025', 'Q3-2025', 'Q4-2025', 'Q1-2026', 'Q2-2026', 'Q3-2026', 'Q4-2026'];
       } else {
-          return ['2025', '2026'];
+          return ['Semua Periode', 'Y1-2025', 'Y2-2026'];
       }
   };
 
@@ -237,27 +238,20 @@ const App = () => {
           const matchesJenis = item.jenisRisiko === filters.jenis;
           
           // Period logic matching (Simple inclusion for now, can be more complex if needed)
-          const matchesPeriode = filters.periode === 'Semua Periode' || item.periode.includes(filters.periode) || filters.periode === '2025' || filters.periode === '2026'; // Simplified for dummy data
+          const matchesPeriode = filters.periode === 'Semua Periode' || item.periode.includes(filters.periode) || filters.periode.includes('Y1') || filters.periode.includes('Y2'); // Simplified for dummy data
           
-          const matchesUnit = filters.unit === 'Semua Departemen' || item.unitKerja === filters.unit;
+          const matchesUnit = filters.unit === 'Semua Unit Kerja' || item.unitKerja === filters.unit;
           
           // 2. RBAC & Hierarchy Logic
           let hasAccess = false;
 
-          if (['Superadmin', 'Admin MRK'].includes(currentUser.role)) {
+          const userRoles = currentUser.roles || ['Superadmin'];
+          if (userRoles.includes('Superadmin') || userRoles.includes('Admin MRK')) {
               hasAccess = true;
-          } else if (currentUser.role === 'Karyawan') {
+          } else if (userRoles.includes('Karyawan')) {
               hasAccess = item.owner === currentUser.id;
-          } else if (currentUser.role === 'AVP') {
-              hasAccess = item.unitKerja === currentUser.unit;
-          } else if (currentUser.role === 'VP') {
-              // VP sees their unit + everything below (Assuming Unit represents the VP's area)
-              hasAccess = item.unitKerja === currentUser.unit; 
-          } else if (currentUser.role === 'SVP') {
-              // SVP sees their Kompartemen
-              hasAccess = item.kompartemen === currentUser.kompartemen;
-          } else if (currentUser.role === 'PIC SISMEN') {
-              hasAccess = currentUser.assignedRiskTypes.includes(item.jenisRisiko);
+          } else if (userRoles.includes('Viewer')) {
+              hasAccess = true; // Viewer can see all
           }
 
           return matchesJenis && matchesPeriode && matchesUnit && hasAccess;
@@ -297,8 +291,8 @@ const App = () => {
   }, [risksList]);
   
   // Real Counts for Stats
-  const activeRisksCount = useMemo(() => risksList.filter(r => r.status !== 'Selesai').length, [risksList]);
-  const inactiveRisksCount = useMemo(() => risksList.filter(r => r.status === 'Selesai').length, [risksList]);
+  const activeRisksCount = useMemo(() => risksList.filter(r => r.status !== 'Draft').length, [risksList]);
+  const inactiveRisksCount = useMemo(() => risksList.filter(r => r.status === 'Selesai Monitoring').length, [risksList]);
   const highRisksCount = useMemo(() => ({
      inherent: risksList.filter(r => (r.inherent.l * r.inherent.c) >= 20).length,
      residual: risksList.filter(r => (r.residual.l * r.residual.c) >= 20).length,
@@ -632,33 +626,31 @@ const App = () => {
                 </div>
                 <h3 className="font-bold text-slate-800 text-sm leading-tight px-2">Farhan Jezando Wardana</h3>
                 <p className="text-[10px] text-slate-400 mt-1">94230665</p>
-                <div className="flex items-center justify-center gap-1 mt-2 w-full">
-                    {/* Role POV Switcher */}
-                    <div className="relative">
-                        <select 
-                            className="bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase outline-none appearance-none cursor-pointer hover:bg-blue-700 text-center pr-4"
-                            value={currentUser.role}
-                            onChange={(e) => setCurrentUser({...currentUser, role: e.target.value})}
+                <div className="flex flex-wrap gap-1 mt-2 w-full justify-center">
+                    {/* Multiple Role Selection */}
+                    {['Superadmin', 'Karyawan', 'Admin MRK', 'Admin Data', 'Viewer'].map(role => (
+                        <button
+                            key={role}
+                            onClick={() => {
+                                const roles = currentUser.roles || ['Superadmin'];
+                                if (roles.includes(role)) {
+                                    if (roles.length > 1) {
+                                        setCurrentUser({...currentUser, roles: roles.filter(r => r !== role)});
+                                    }
+                                } else {
+                                    setCurrentUser({...currentUser, roles: [...roles, role]});
+                                }
+                            }}
+                            className={`text-[9px] font-bold px-2 py-0.5 rounded-full transition-colors ${
+                                (currentUser.roles || ['Superadmin']).includes(role)
+                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                            }`}
+                            title={`Klik untuk ${(currentUser.roles || ['Superadmin']).includes(role) ? 'hapus' : 'tambah'} role`}
                         >
-                            <option value="Superadmin">Superadmin</option>
-                            <option value="Karyawan">Karyawan</option>
-                            <option value="Admin MRK">Admin MRK</option>
-                            <option value="Admin Data">Admin Data</option>
-                            <option value="Viewer">Viewer</option>
-                        </select>
-                        <ChevronDown size={8} className="absolute right-1 top-1/2 -translate-y-1/2 text-blue-200 pointer-events-none" />
-                    </div>
-                    {/* Mockup Additional Roles Counter */}
-                    <button 
-                        onClick={() => {
-                            const current = parseInt(currentUser.extraRoles || "4");
-                            setCurrentUser({...currentUser, extraRoles: current >= 5 ? "0" : (current + 1).toString()});
-                        }}
-                        className="bg-slate-200 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-full hover:bg-slate-300 transition-colors cursor-pointer select-none"
-                        title="Klik untuk simulasi tambah/hapus role (+1)"
-                    >
-                        +{currentUser.extraRoles || "4"}
-                    </button>
+                            {role}
+                        </button>
+                    ))}
                 </div>
                 
                 {/* Department Selector */}
@@ -851,7 +843,7 @@ const App = () => {
                             onChange={(e) => setFilters({...filters, unit: e.target.value})}
                             className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
                         >
-                            <option>Semua Departemen</option>
+                            <option>Semua Unit Kerja</option>
                             <option>Departemen Lingkungan Hidup</option>
                             <option>Departemen K3</option>
                             <option>Departemen Operasi</option>
