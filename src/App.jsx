@@ -58,8 +58,9 @@ const generateDummyData = () => {
     ];
     // Register Risk Statuses
     const registerStatuses = [
-        'Draft', 
         'Baru',
+        'Draft', 
+        'Revisi',
         'Menunggu Approval VP/PM Unit Kerja', 
         'Menunggu Approval SVP Unit Kerja', 
         'Menunggu Approval VP MRK', 
@@ -82,6 +83,7 @@ const generateDummyData = () => {
     const sasaranGenerik = ['Hukum, Reputasi dan Kepatuhan', 'Keuangan', 'Operasional', 'Pasar dan Makroekonomi', 'Proyek', 'Strategis', 'Teknologi dan Keamanan Siber'];
     const aktivitasGenerik = ['Pengadaan', 'Produksi', 'Distribusi', 'Pemasaran', 'Keuangan', 'SDM', 'IT'];
     const taksonomiRisiko = ['Risiko Pasar', 'Risiko Kredit', 'Risiko Likuiditas', 'Risiko Operasional', 'Risiko Hukum', 'Risiko Strategis', 'Risiko Reputasi'];
+    const grades = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'TKNO'];
     
     // Palet warna untuk risiko
     const colors = [
@@ -96,6 +98,7 @@ const generateDummyData = () => {
         const status = allStatuses[Math.floor(Math.random() * allStatuses.length)];
         const period = periods[Math.floor(Math.random() * periods.length)];
         const category = sasaranGenerik[Math.floor(Math.random() * sasaranGenerik.length)];
+        const grade = grades[Math.floor(Math.random() * grades.length)];
         
         // Generate Scores
         const inL = Math.ceil(Math.random() * 5);
@@ -128,6 +131,7 @@ const generateDummyData = () => {
             kategoriRisiko: category, // Sasaran Generik
             aktivitasGenerik: aktivitasGenerik[Math.floor(Math.random() * aktivitasGenerik.length)],
             taksonomiRisiko: taksonomiRisiko[Math.floor(Math.random() * taksonomiRisiko.length)],
+            grade: grade,
             unitKerja: unit,
             kompartemen: unit.includes('Operasi') ? 'Kompartemen Operasi' : 'Kompartemen Pendukung',
             periode: period,
@@ -162,10 +166,13 @@ const App = () => {
   const [sortConfig, setSortConfig] = useState({ key: 'code', direction: 'asc' });
   const [columnFilters, setColumnFilters] = useState({
     code: '',
-    description: '',
-    status: '',
+    unit: '',
+    sasaran: '',
+    aktivitas: '',
+    risiko: '',
     cause: '',
-    impact: ''
+    impact: '',
+    status: ''
   });
 
   // Helper level risiko
@@ -184,8 +191,8 @@ const App = () => {
       case 'High': return 'text-red-700 bg-red-100 border-red-200';
       case 'Moderate to High': return 'text-orange-700 bg-orange-100 border-orange-200';
       case 'Moderate': return 'text-yellow-700 bg-yellow-100 border-yellow-200';
-      case 'Low to Moderate': return 'text-lime-700 bg-lime-100 border-lime-200';
-      case 'Low': return 'text-green-700 bg-green-100 border-green-200';
+      case 'Low to Moderate': return 'text-lime-700 bg-lime-100 border-lime-200'; // Hijau Muda
+      case 'Low': return 'text-emerald-800 bg-emerald-100 border-emerald-200'; // Hijau Tua
       default: return 'text-slate-400 bg-slate-50 border-slate-200';
     }
   };
@@ -264,20 +271,37 @@ const App = () => {
       const grouped = {};
       
       risksList.forEach(r => {
-          // Use the selected category field. For now simply mapping 'Sasaran Generik' -> 'kategoriRisiko'
-          // In a real app, you might have different fields for 'Aktivitas Generik', etc.
-          const key = r.kategoriRisiko || 'Other'; 
+          // Filter by Grade
+          if (filters.chartGrades.length > 0 && !filters.chartGrades.includes(r.grade)) return;
+
+          // Use the selected category field.
+          let key = '';
+          if (filters.chartCategory === 'Sasaran Generik') key = r.kategoriRisiko;
+          else if (filters.chartCategory === 'Aktivitas Generik') key = r.aktivitasGenerik;
+          else if (filters.chartCategory === 'Risiko Generik') key = r.jenisRisiko; 
+          else if (filters.chartCategory === 'Taksonomi Risiko') key = r.taksonomiRisiko;
+          else key = 'Other';
           
-          if (!grouped[key]) grouped[key] = { name: key, High: 0, Moderate: 0, Low: 0 };
+          if (!key) key = 'Uncategorized';
+
+          if (!grouped[key]) grouped[key] = { 
+              name: key, 
+              'High': 0, 
+              'Moderate to High': 0, 
+              'Moderate': 0, 
+              'Low to Moderate': 0, 
+              'Low': 0 
+          };
           
           const score = r.residual.l * r.residual.c;
-          if (score >= 15) grouped[key].High++;
-          else if (score >= 8) grouped[key].Moderate++; // Changed logic to match standard risk matrix somewhat
-          else grouped[key].Low++;
+          const level = getLevelLabel(score);
+          if (grouped[key][level] !== undefined) {
+              grouped[key][level]++;
+          }
       });
 
       return Object.values(grouped);
-  }, [risksList, filters.chartCategory]);
+  }, [risksList, filters.chartCategory, filters.chartGrades]);
 
   // --- LOGIC TAMBAHAN DEPENDENT ON RISKS LIST ---
 
@@ -393,11 +417,17 @@ const App = () => {
 
   const filteredTable = useMemo(() => {
     let result = [...tableData].filter(item => {
+      // Helper for safe string check
+      const check = (val, filter) => (val || '').toLowerCase().includes((filter || '').toLowerCase());
+      
       return (
-        item.code.toLowerCase().includes(columnFilters.code.toLowerCase()) &&
-        item.desc.toLowerCase().includes(columnFilters.description.toLowerCase()) &&
-        item.cause.toLowerCase().includes(columnFilters.cause.toLowerCase()) &&
-        item.impact.toLowerCase().includes(columnFilters.impact.toLowerCase()) &&
+        check(item.code, columnFilters.code) &&
+        check(item.unitKerja, columnFilters.unit) &&
+        check(item.kategoriRisiko, columnFilters.sasaran) &&
+        check(item.aktivitasGenerik, columnFilters.aktivitas) &&
+        check(item.desc, columnFilters.risiko) &&
+        check(item.cause, columnFilters.cause) &&
+        check(item.impact, columnFilters.impact) &&
         (columnFilters.status === '' || item.status === columnFilters.status)
       );
     });
@@ -422,7 +452,7 @@ const App = () => {
     setSelectedCellData({
       title: `Risiko Berstatus: ${statusLabel}`,
       subtitle: `Menampilkan daftar risiko dalam tahap ${statusLabel}`,
-      risks: risksList.filter(r => r.status === statusLabel).map(r => ({ id: r.id, code: r.code, desc: r.desc }))
+      risks: risksList.filter(r => r.status === statusLabel || (statusLabel === 'Aktif' && r.status !== 'Draft') || (statusLabel === 'Inaktif' && r.status === 'Selesai Monitoring')).map(r => ({ ...r }))
     });
     setShowModal(true);
   };
@@ -431,7 +461,7 @@ const App = () => {
     setSelectedCellData({
       title: `Risiko High (${type.toUpperCase()})`,
       subtitle: `Daftar risiko dengan Skala >= 20 pada kategori ${type}`,
-      risks: risksList.filter(r => (r[type].l * r[type].c) >= 20).map(r => ({ id: r.id, code: r.code, desc: r.desc }))
+      risks: risksList.filter(r => (r[type].l * r[type].c) >= 20).map(r => ({ ...r }))
     });
     setShowModal(true);
   };
@@ -471,23 +501,7 @@ const App = () => {
           
           // Check Risk Level
           const score = r.residual.l * r.residual.c;
-          let level = 'Low';
-          if (score >= 12) level = 'High';      // Adjusted to standard 12+ (Red/High)
-          else if (score >= 5) level = 'Moderate'; // 5-9 usually Moderate/Yellow
-          else level = 'Low'; // 1-4 Green
-          
-          // Note: My dummy data gen uses random scores, this logic needs to match chart data gen logic.
-          // Chart Data Gen Logic was: 
-          // if (score >= 15) grouped[key].High++;
-          // else if (score >= 8) grouped[key].Moderate++;
-          // else grouped[key].Low++;
-          
-          // Let's align them.
-           if (score >= 15) level = 'High';
-           else if (score >= 8) level = 'Moderate';
-           else level = 'Low';
-
-          return level === pLevel;
+          return getLevelLabel(score) === pLevel;
       });
 
       setSelectedCellData({
@@ -509,8 +523,8 @@ const App = () => {
       if (sum >= 9) return 'bg-red-600/10';
       if (sum >= 7) return 'bg-orange-500/10';
       if (sum >= 6) return 'bg-yellow-400/10';
-      if (sum >= 4) return 'bg-green-400/10';
-      return 'bg-green-700/10';
+      if (sum >= 4) return 'bg-lime-400/10';
+      return 'bg-emerald-700/10';
     };
 
     const levelCounts = list.reduce((acc, risk) => {
@@ -526,7 +540,7 @@ const App = () => {
         setSelectedCellData({
           title: `Risiko ${title} (Level ${r}x${c})`,
           subtitle: `Detail risiko pada matriks ${title} - Likelihood ${r}, Consequence ${c}`,
-          risks: risksInCell
+          risks: risksInCell.map(r => ({...r}))
         });
         setShowModal(true);
       }
@@ -556,15 +570,17 @@ const App = () => {
                     onClick={() => hasRisks && handleCellClick(r, c)}
                     className={`h-14 w-full flex flex-wrap gap-1 p-1 items-center justify-center rounded-sm border border-white relative transition-all ${getCellColor(r, c)} ${hasRisks ? 'cursor-pointer hover:brightness-95 hover:scale-105 z-10' : ''}`}
                   >
-                    {risksInCell.slice(0, 4).map(risk => (
+                    {risksInCell.slice(0, 5).map(risk => (
                       <div 
                         key={risk.id} 
-                        className={`w-3.5 h-3.5 rounded-full ${risk.color} shadow-sm border border-white relative group transition-all duration-300`}
+                        className={`w-3 h-3 rounded-full ${risk.id === hoveredRiskId ? 'ring-2 ring-blue-500 scale-125 z-20' : ''} ${risk.color} shadow-sm border border-white relative group transition-all duration-300`}
                         title={risk.code}
+                        onMouseEnter={() => setHoveredRiskId(risk.id)}
+                        onMouseLeave={() => setHoveredRiskId(null)}
                       >
                       </div>
                     ))}
-                    {risksInCell.length > 4 && <span className="text-[8px] font-black text-slate-500">+{risksInCell.length - 4}</span>}
+                    {risksInCell.length > 5 && <span className="text-[8px] font-black text-slate-500">+{risksInCell.length - 5}</span>}
                   </div>
                 );
               }))}
@@ -573,17 +589,16 @@ const App = () => {
           </div>
         </div>
         
-        {/* RINGKASAN JUMLAH RISIKO */}
+        {/* RINGKASAN JUMLAH RISIKO - Updated to Horizontal Low -> High */}
         <div className="mt-auto border-t pt-4">
            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">Ringkasan Level (Klik untuk Detail):</p>
-           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-              {['High', 'Moderate to High', 'Moderate', 'Low to Moderate', 'Low'].map(lvl => (
-                <button key={lvl} onClick={() => handleLevelClick(lvl, type)} className="flex items-center justify-between text-[10px] w-full hover:bg-slate-50 p-1 rounded transition-colors group">
-                  <div className="flex items-center gap-1.5">
+           <div className="flex flex-wrap gap-2 justify-between">
+              {['Low', 'Low to Moderate', 'Moderate', 'Moderate to High', 'High'].map(lvl => (
+                <button key={lvl} onClick={() => handleLevelClick(lvl, type)} className="flex items-center gap-1.5 hover:bg-slate-50 rounded p-1 transition-colors group">
+                     {/* Dot */}
                      <div className={`w-2 h-2 rounded-full ${getLevelColorClass(lvl).split(' ')[0]}`}></div>
-                     <span className="text-slate-500 font-bold uppercase group-hover:text-blue-600 transition-colors">{lvl}:</span>
-                  </div>
-                  <span className={`font-black ${getLevelColorClass(lvl).split(' ')[0]}`}>{levelCounts[lvl] || 0}</span>
+                     {/* Count */}
+                     <span className={`text-[10px] font-black ${getLevelColorClass(lvl).split(' ')[0]}`}>{levelCounts[lvl] || 0}</span>
                 </button>
               ))}
            </div>
@@ -859,23 +874,23 @@ const App = () => {
                 <div className="space-y-4">
                     {/* Row 1: Totals */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-5 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-between relative overflow-hidden group">
+                        <div onClick={() => handleStatusClick('Aktif')} className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-5 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform">
                            <div>
                                <p className="text-xs font-medium text-blue-100 mb-1 flex items-center">
                                    Total Risiko Aktif
-                                   <InfoTooltip text="Jumlah risiko yang masih aktif dan memerlukan mitigasi/pemantauan terus-menerus. Risiko dianggap aktif jika belum berstatus 'Selesai'." />
+                                   <InfoTooltip text="Jumlah risiko yang masih aktif (Selain Draft)." />
                                </p>
-                               <h3 className="text-4xl font-black tracking-tight">{risksList.filter(r => r.status !== 'Selesai').length}</h3>
+                               <h3 className="text-4xl font-black tracking-tight">{activeRisksCount}</h3>
                            </div>
                            <ActivityIcon size={48} className="text-blue-500 opacity-40 absolute right-4 bottom-[-10px] group-hover:scale-110 transition-transform" />
                         </div>
-                        <div className="bg-white border border-slate-200 text-slate-700 p-5 rounded-xl shadow-sm flex items-center justify-between relative overflow-hidden group">
+                        <div onClick={() => handleStatusClick('Inaktif')} className="bg-white border border-slate-200 text-slate-700 p-5 rounded-xl shadow-sm flex items-center justify-between relative overflow-hidden group cursor-pointer hover:border-blue-400 hover:shadow-md transition-all">
                            <div>
                                <p className="text-xs font-bold text-slate-400 mb-1 flex items-center">
-                                   Total Risiko Selesai (Inaktif)
-                                   <InfoTooltip text="Jumlah risiko yang telah ditutup atau selesai dimitigasi (Level Residual sudah mencapai Target)." />
+                                   Total Risiko Inaktif
+                                   <InfoTooltip text="Jumlah risiko yang telah selesai monitoring (Selesai Monitoring)." />
                                </p>
-                               <h3 className="text-4xl font-black tracking-tight text-slate-800">{risksList.filter(r => r.status === 'Selesai').length}</h3>
+                               <h3 className="text-4xl font-black tracking-tight text-slate-800">{inactiveRisksCount}</h3>
                            </div>
                            <CheckCircle size={48} className="text-slate-200 absolute right-4 bottom-[-10px] group-hover:scale-110 transition-transform" />
                         </div>
@@ -887,18 +902,22 @@ const App = () => {
                             Register Risk Status
                             <InfoTooltip text="Status dokumen pendaftaran risiko baru. Mulai dari Draft hingga berbagai tahapan approval." />
                         </h4>
-                        <div className="flex gap-3 min-w-max">
+                        <div className="grid grid-cols-2 lg:flex lg:flex-nowrap gap-3 min-w-max">
                             {[
+                                { l: 'Baru', c: risksList.filter(r => r.status === 'Baru').length, color: 'bg-blue-50 text-blue-600' },
                                 { l: 'Draft', c: risksList.filter(r => r.status === 'Draft').length, color: 'bg-slate-100 text-slate-600' },
                                 { l: 'Revisi', c: risksList.filter(r => r.status === 'Revisi').length, color: 'bg-red-50 text-red-600' },
-                                { l: 'Menunggu Approval VP Unit', c: risksList.filter(r => r.status.includes('Approval VP Unit')).length, color: 'bg-orange-50 text-orange-600' },
-                                { l: 'Menunggu Approval SVP Unit', c: risksList.filter(r => r.status.includes('Approval SVP Unit')).length, color: 'bg-orange-50 text-orange-600' },
-                                { l: 'Menunggu Approval Staff MRK', c: risksList.filter(r => r.status.includes('Approval Staff MRK')).length, color: 'bg-orange-50 text-orange-600' },
-                                { l: 'Menunggu Approval VP MRK', c: risksList.filter(r => r.status.includes('Approval VP MRK')).length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Menunggu Approval VP/PM Unit Kerja', c: risksList.filter(r => r.status === 'Menunggu Approval VP/PM Unit Kerja').length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Menunggu Approval SVP Unit Kerja', c: risksList.filter(r => r.status === 'Menunggu Approval SVP Unit Kerja').length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Menunggu Approval VP MRK', c: risksList.filter(r => r.status === 'Menunggu Approval VP MRK').length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Menunggu Approval SVP TKMR', c: risksList.filter(r => r.status === 'Menunggu Approval SVP TKMR').length, color: 'bg-orange-50 text-orange-600' },
                             ].map((stat, i) => (
-                                <div key={i} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/5 transition-all flex flex-col items-center min-w-[120px]`}>
+                                <div key={i} onClick={() => handleStatusClick(stat.l)} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/10 transition-all flex flex-col items-center min-w-[140px] cursor-pointer group hover:shadow-sm relative`}>
                                     <span className="text-2xl font-black mb-1">{stat.c}</span>
-                                    <span className="text-[9px] font-bold text-center uppercase leading-tight opacity-80">{stat.l}</span>
+                                    <span className="text-[9px] font-bold text-center uppercase leading-tight opacity-80 line-clamp-2">{stat.l}</span>
+                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                       <InfoTooltip text={stat.l} />
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -910,18 +929,23 @@ const App = () => {
                              Monitoring Risk Status
                              <InfoTooltip text="Status dokumen pemantauan (monitoring) risiko berkala." />
                          </h4>
-                         <div className="flex gap-3 min-w-max">
+                         <div className="grid grid-cols-2 lg:flex lg:flex-nowrap gap-3 min-w-max">
                             {[
-                                { l: 'Baru', c: risksList.filter(r => r.status === 'Baru').length, color: 'bg-blue-50 text-blue-600' },
                                 { l: 'Berjalan', c: risksList.filter(r => r.status === 'Berjalan').length, color: 'bg-emerald-50 text-emerald-600' },
                                 { l: 'Revisi Monitoring', c: risksList.filter(r => r.status === 'Revisi Monitoring').length, color: 'bg-red-50 text-red-600' },
-                                { l: 'Menunggu Appr. Mon. VP', c: risksList.filter(r => r.status.includes('Monitoring VP')).length, color: 'bg-amber-50 text-amber-600' },
-                                { l: 'Menunggu Appr. Mon. SVP', c: risksList.filter(r => r.status.includes('Monitoring SVP')).length, color: 'bg-amber-50 text-amber-600' },
-                                { l: 'Menunggu Appr. Mon. Staff MRK', c: risksList.filter(r => r.status.includes('Monitoring Staff MRK')).length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Approval Monitoring VP/PM Unit Kerja', c: risksList.filter(r => r.status === 'Menunggu Approval Monitoring VP/PM Unit Kerja').length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Approval Monitoring SVP Unit Kerja', c: risksList.filter(r => r.status === 'Menunggu Approval Monitoring SVP Unit Kerja').length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Approval Monitoring Staff MRK', c: risksList.filter(r => r.status === 'Menunggu Approval Monitoring Staff MRK').length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Approval Monitoring VP MRK', c: risksList.filter(r => r.status === 'Menunggu Approval Monitoring VP MRK').length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Approval Monitoring SVP TKMR', c: risksList.filter(r => r.status === 'Menunggu Approval Monitoring SVP TKMR').length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Selesai Monitoring', c: risksList.filter(r => r.status === 'Selesai Monitoring').length, color: 'bg-blue-50 text-blue-600' },
                             ].map((stat, i) => (
-                                <div key={i} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/5 transition-all flex flex-col items-center min-w-[120px]`}>
+                                <div key={i} onClick={() => handleStatusClick(stat.l)} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/10 transition-all flex flex-col items-center min-w-[140px] cursor-pointer group hover:shadow-sm relative`}>
                                     <span className="text-2xl font-black mb-1">{stat.c}</span>
-                                    <span className="text-[9px] font-bold text-center uppercase leading-tight opacity-80">{stat.l}</span>
+                                    <span className="text-[9px] font-bold text-center uppercase leading-tight opacity-80 line-clamp-2">{stat.l}</span>
+                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                       <InfoTooltip text={stat.l} />
+                                    </div>
                                 </div>
                             ))}
                          </div>
@@ -939,11 +963,33 @@ const App = () => {
                              </h3>
                              <p className="text-xs text-slate-400 mt-1">Distribusi level risiko residual per kategori yang dipilih.</p>
                         </div>
-                        <div className="flex gap-3">
-                             <select className="text-[10px] font-bold bg-slate-50 border border-slate-200 rounded px-3 py-2 outline-none">
-                                <option>Grade 1-7</option>
-                                <option>Checklist TKO</option>
-                             </select>
+                        <div className="flex gap-3 items-center">
+                             {/* Grade Filter Dropdown with Checkboxes */}
+                             <div className="relative group">
+                                <button className="flex items-center gap-2 text-[10px] font-bold bg-slate-50 border border-slate-200 rounded px-3 py-2 hover:bg-slate-100">
+                                    <Filter size={12} />
+                                    Filter Grade ({filters.chartGrades.length})
+                                </button>
+                                <div className="hidden group-hover:block absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 shadow-xl rounded-lg p-2 z-50">
+                                    {['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'TKNO'].map(g => (
+                                        <label key={g} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer text-[10px] font-bold text-slate-600">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={filters.chartGrades.includes(g)}
+                                                onChange={(e) => {
+                                                    const newGrades = e.target.checked 
+                                                        ? [...filters.chartGrades, g]
+                                                        : filters.chartGrades.filter(item => item !== g);
+                                                    setFilters({...filters, chartGrades: newGrades});
+                                                }}
+                                                className="rounded border-slate-300 text-blue-600 focus:ring-0 w-3 h-3"
+                                            />
+                                            {g}
+                                        </label>
+                                    ))}
+                                </div>
+                             </div>
+
                              <select 
                                 value={filters.chartCategory}
                                 onChange={(e) => setFilters({...filters, chartCategory: e.target.value})}
@@ -965,11 +1011,15 @@ const App = () => {
                                 <Tooltip 
                                     cursor={{fill: '#f8fafc'}} 
                                     contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
+                                    labelStyle={{fontSize: '11px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px'}}
+                                    itemStyle={{fontSize: '10px', padding: '2px 0'}}
                                 />
-                                <Legend wrapperStyle={{paddingTop: '20px', fontSize: '12px'}} />
-                                <Bar dataKey="High" name="High Risk" stackId="a" fill="#ef4444" barSize={40} onClick={(data) => handleChartBarClick(data, 'High')} className="cursor-pointer hover:opacity-80" />
-                                <Bar dataKey="Moderate" name="Moderate Risk" stackId="a" fill="#eab308" barSize={40} onClick={(data) => handleChartBarClick(data, 'Moderate')} className="cursor-pointer hover:opacity-80" />
-                                <Bar dataKey="Low" name="Low Risk" stackId="a" fill="#22c55e" barSize={40} radius={[4, 4, 0, 0]} onClick={(data) => handleChartBarClick(data, 'Low')} className="cursor-pointer hover:opacity-80" />
+                                <Legend wrapperStyle={{paddingTop: '20px', fontSize: '10px'}} iconSize={8} />
+                                <Bar dataKey="High" name="High" stackId="a" fill="#dc2626" barSize={40} onClick={(data) => handleChartBarClick(data, 'High')} className="cursor-pointer hover:opacity-80" />
+                                <Bar dataKey="Moderate to High" name="Moderate to High" stackId="a" fill="#f97316" barSize={40} onClick={(data) => handleChartBarClick(data, 'Moderate to High')} className="cursor-pointer hover:opacity-80" />
+                                <Bar dataKey="Moderate" name="Moderate" stackId="a" fill="#eab308" barSize={40} onClick={(data) => handleChartBarClick(data, 'Moderate')} className="cursor-pointer hover:opacity-80" />
+                                <Bar dataKey="Low to Moderate" name="Low to Moderate" stackId="a" fill="#84cc16" barSize={40} onClick={(data) => handleChartBarClick(data, 'Low to Moderate')} className="cursor-pointer hover:opacity-80" />
+                                <Bar dataKey="Low" name="Low" stackId="a" fill="#059669" barSize={40} radius={[4, 4, 0, 0]} onClick={(data) => handleChartBarClick(data, 'Low')} className="cursor-pointer hover:opacity-80" />
                             </BarChart>
                          </ResponsiveContainer>
                     </div>
@@ -983,29 +1033,52 @@ const App = () => {
                     </div>
 
                     {/* Completion Stats (1/3 width) */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
-                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <PieChart size={18} className="text-blue-600" />
-                            Kelengkapan Pengisian
-                            <InfoTooltip text="Persentase kelengkapan pengisian data risiko per unit kerja/departemen untuk periode aktif." />
-                        </h3>
-                        
-                        <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar max-h-[400px]">
-                            {['Departemen K3', 'Departemen Lingkungan Hidup', 'Departemen Operasi', 'Departemen HR', 'Departemen IT'].map((dept, i) => {
-                                const pct = Math.floor(Math.random() * 40) + 60; // Mock percentage
-                                return (
-                                    <div key={i}>
-                                        <div className="flex justify-between text-xs mb-1">
-                                            <span className="font-bold text-slate-600">{dept}</span>
-                                            <span className={`font-black ${pct < 80 ? 'text-orange-500' : 'text-green-600'}`}>{pct}%</span>
+                    <div className="flex flex-col gap-4">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex-1">
+                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <PieChart size={18} className="text-blue-600" />
+                                Kelengkapan Pengisian
+                                <InfoTooltip text="Persentase kelengkapan pengisian data risiko per unit kerja." />
+                            </h3>
+                            
+                            <div className="space-y-4">
+                                {['Departemen K3', 'Departemen Lingkungan Hidup', 'Departemen Operasi', 'Departemen HR', 'Departemen IT'].map((dept, i) => {
+                                    const pct = [100, 85, 92, 78, 88][i]; // Static mock
+                                    const filled = [340, 255, 184, 156, 44][i];
+                                    const total = [340, 300, 200, 200, 50][i];
+                                    return (
+                                        <div key={i}>
+                                            <div className="flex justify-between text-xs mb-1">
+                                                <span className="font-bold text-slate-600">{dept}</span>
+                                                <span className={`font-black ${pct < 80 ? 'text-orange-500' : 'text-green-600'}`}>{pct}%</span>
+                                            </div>
+                                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                <div className={`h-full rounded-full ${pct < 80 ? 'bg-orange-400' : 'bg-green-500'}`} style={{width: `${pct}%`}}></div>
+                                            </div>
+                                            <p className="text-[9px] text-slate-400 mt-1">{filled} dari {total} Risiko Teridentifikasi</p>
                                         </div>
-                                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                            <div className={`h-full rounded-full ${pct < 80 ? 'bg-orange-400' : 'bg-green-500'}`} style={{width: `${pct}%`}}></div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex-1">
+                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <Activity size={18} className="text-blue-600" />
+                                Kelengkapan Monitoring
+                                <InfoTooltip text="Jumlah risiko dengan status 'Berjalan' per unit kerja." />
+                            </h3>
+                            <div className="space-y-3">
+                                {['Departemen K3', 'Departemen Lingkungan Hidup', 'Departemen Operasi', 'Departemen HR'].map((dept, i) => {
+                                    const count = risksList.filter(r => r.unitKerja === dept && r.status === 'Berjalan').length;
+                                    return (
+                                        <div key={i} className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
+                                            <span className="text-[10px] font-bold text-slate-600">{dept}</span>
+                                            <span className="text-xs font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">{count} Berjalan</span>
                                         </div>
-                                        <p className="text-[9px] text-slate-400 mt-1">290 dari 340 Karyawan sudah mengisi</p>
-                                    </div>
-                                )
-                            })}
+                                    )
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1022,47 +1095,142 @@ const App = () => {
                           <Download size={14} /> Export CSV
                        </button>
                    </div>
-                   <div className="overflow-x-auto min-h-[300px]">
-                       <table className="w-full text-left border-collapse">
-                          <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 sticky top-0 z-10">
+                   <div className="overflow-x-auto min-h-[400px]">
+                       <table className="w-full text-left border-collapse min-w-[2000px]">
+                          <thead className="bg-slate-800 text-[10px] font-black uppercase text-slate-400 sticky top-0 z-20">
                                <tr>
-                                   <th className="p-3 border-b px-4">Kode</th>
-                                   <th className="p-3 border-b w-1/3 min-w-[250px]">Pernyataan Risiko</th>
-                                   <th className="p-3 border-b text-center">Owner</th>
-                                   <th className="p-3 border-b text-center">Inherent</th>
-                                   <th className="p-3 border-b text-center">Residual</th>
+                                   <th className="p-3 border-r border-slate-700 w-[100px] sticky left-0 bg-slate-800 z-30">
+                                       Kode
+                                       <input className="mt-1 w-full bg-slate-700 border-none rounded text-white px-1 py-0.5 text-[9px]" placeholder="Filter..." value={columnFilters.code} onChange={e => setColumnFilters({...columnFilters, code: e.target.value})} />
+                                   </th>
+                                   <th className="p-3 border-r border-slate-700 w-[150px] sticky left-[100px] bg-slate-800 z-30">
+                                       Unit Kerja
+                                       <input className="mt-1 w-full bg-slate-700 border-none rounded text-white px-1 py-0.5 text-[9px]" placeholder="Filter..." value={columnFilters.unit} onChange={e => setColumnFilters({...columnFilters, unit: e.target.value})} />
+                                   </th>
+                                   <th className="p-3 border-r border-slate-700 w-[150px]">
+                                       Sasaran
+                                       {/* Sasaran Generik / Kategori */}
+                                       <input className="mt-1 w-full bg-slate-700 border-none rounded text-white px-1 py-0.5 text-[9px]" placeholder="Filter..." value={columnFilters.sasaran} onChange={e => setColumnFilters({...columnFilters, sasaran: e.target.value})} />
+                                   </th>
+                                   <th className="p-3 border-r border-slate-700 w-[150px]">
+                                       Aktivitas
+                                       <input className="mt-1 w-full bg-slate-700 border-none rounded text-white px-1 py-0.5 text-[9px]" placeholder="Filter..." value={columnFilters.aktivitas} onChange={e => setColumnFilters({...columnFilters, aktivitas: e.target.value})} />
+                                   </th>
+                                   <th className="p-3 border-r border-slate-700 w-[200px]">
+                                       Risiko
+                                       <input className="mt-1 w-full bg-slate-700 border-none rounded text-white px-1 py-0.5 text-[9px]" placeholder="Filter..." value={columnFilters.risiko} onChange={e => setColumnFilters({...columnFilters, risiko: e.target.value})} />
+                                   </th>
+                                   <th className="p-3 border-r border-slate-700 w-[200px]">
+                                       Dampak
+                                       <input className="mt-1 w-full bg-slate-700 border-none rounded text-white px-1 py-0.5 text-[9px]" placeholder="Filter..." value={columnFilters.impact} onChange={e => setColumnFilters({...columnFilters, impact: e.target.value})} />
+                                   </th>
+                                   <th className="p-3 border-r border-slate-700 w-[150px]">
+                                       Rencana Mitigasi
+                                   </th>
+                                   
+                                   {/* BASELINE INHERENT */}
+                                   <th colSpan="3" className="p-1 text-center bg-blue-900 border-r border-slate-700">Inherent</th>
+                                   
+                                   {/* MONITORING PERIODS */}
+                                   {filters.jenis === 'OPERASIONAL' ? (
+                                       <>
+                                         <th colSpan="3" className="p-1 text-center bg-slate-700 border-r border-slate-600">Q1</th>
+                                         <th colSpan="3" className="p-1 text-center bg-slate-700 border-r border-slate-600">Q2</th>
+                                         <th colSpan="3" className="p-1 text-center bg-slate-700 border-r border-slate-600">Q3</th>
+                                         <th colSpan="3" className="p-1 text-center bg-slate-700 border-r border-slate-600">Q4</th>
+                                       </>
+                                   ) : (
+                                       monthKeys.map(m => (
+                                           <th key={m} colSpan="3" className="p-1 text-center bg-slate-700 border-r border-slate-600">{m.toUpperCase()}</th>
+                                       ))
+                                   )}
+                                   
+                                   {/* TARGET */}
+                                   <th colSpan="3" className="p-1 text-center bg-emerald-900 border-r border-slate-700">Target</th>
+                               </tr>
+                               {/* SUB HEADER L, C, S */}
+                               <tr className="bg-slate-800 text-white text-[9px]">
+                                   <th className="sticky left-0 bg-slate-800 z-30"></th>
+                                   <th className="sticky left-[100px] bg-slate-800 z-30"></th>
+                                   <th colSpan="5"></th>
+                                   
+                                   <th className="text-center w-8 bg-blue-900/50">L</th>
+                                   <th className="text-center w-8 bg-blue-900/50">C</th>
+                                   <th className="text-center w-8 bg-blue-900/50">S</th>
+
+                                   {filters.jenis === 'OPERASIONAL' ? (
+                                        [1,2,3,4].map(q => (
+                                            <React.Fragment key={q}>
+                                                <th className="text-center w-8 bg-slate-700/50 border-l border-slate-600">L</th>
+                                                <th className="text-center w-8 bg-slate-700/50">C</th>
+                                                <th className="text-center w-8 bg-slate-700/50 border-r border-slate-600">S</th>
+                                            </React.Fragment>
+                                        ))
+                                   ) : (
+                                        monthKeys.map(m => (
+                                            <React.Fragment key={m}>
+                                                <th className="text-center w-8 bg-slate-700/50 border-l border-slate-600">L</th>
+                                                <th className="text-center w-8 bg-slate-700/50">C</th>
+                                                <th className="text-center w-8 bg-slate-700/50 border-r border-slate-600">S</th>
+                                            </React.Fragment>
+                                        ))
+                                   )}
+
+                                   <th className="text-center w-8 bg-emerald-900/50 border-l border-slate-700">L</th>
+                                   <th className="text-center w-8 bg-emerald-900/50">C</th>
+                                   <th className="text-center w-8 bg-emerald-900/50">S</th>
                                </tr>
                           </thead>
                           <tbody className="text-xs divide-y divide-slate-100 bg-white">
                                {filteredTable.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((row, idx) => (
                                    <tr key={idx} className="hover:bg-slate-50 transition-colors group">
-                                       <td className="p-3 px-4 font-mono font-bold text-blue-600">
-                                            <a href="#" className="hover:underline hover:text-blue-800">{row.code}</a>
+                                       <td className="p-3 font-mono font-bold text-blue-600 border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50 z-20">
+                                            <a href="#" className="hover:underline">{row.code}</a>
                                        </td>
-                                       <td className="p-3">
-                                           <div className="font-bold text-slate-700 mb-1 line-clamp-2">{row.desc}</div>
-                                           <div className="flex gap-2">
-                                               <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                                                    row.status.includes('Draft') ? 'bg-slate-100 text-slate-500' :
-                                                    row.status.includes('Appro') ? 'bg-orange-50 text-orange-600' :
-                                                    'bg-green-50 text-green-600'
-                                                }`}>{row.status}</span>
-                                                <span className="text-[9px] text-slate-400 border border-slate-100 px-1 rounded">{row.unitKerja}</span>
-                                           </div>
-                                       </td>
-                                       <td className="p-3 text-center text-[10px] text-slate-500">
-                                            {row.owner}
-                                       </td>
-                                       <td className="p-3 text-center">
-                                           <div className={`w-6 h-6 rounded flex items-center justify-center mx-auto text-[10px] font-black text-white ${getLevelColorClass(getLevelLabel(row.inherent.l * row.inherent.c)).replace('text-', 'bg-').split(' ')[1]}`}>
-                                               {row.inherent.l * row.inherent.c}
-                                           </div>
-                                       </td>
-                                       <td className="p-3 text-center">
-                                           <div className={`w-6 h-6 rounded flex items-center justify-center mx-auto text-[10px] font-black text-white ${getLevelColorClass(getLevelLabel(row.residual.l * row.residual.c)).replace('text-', 'bg-').split(' ')[1]}`}>
-                                               {row.residual.l * row.residual.c}
-                                           </div>
-                                       </td>
+                                       <td className="p-3 border-r border-slate-100 sticky left-[100px] bg-white group-hover:bg-slate-50 z-20 text-[10px]">{row.unitKerja}</td>
+                                       <td className="p-3 border-r border-slate-100 text-[10px]">{row.kategoriRisiko}</td>
+                                       <td className="p-3 border-r border-slate-100 text-[10px]">{row.aktivitasGenerik}</td>
+                                       <td className="p-3 border-r border-slate-100 font-bold text-slate-700 text-[10px]">{row.desc}</td>
+                                       <td className="p-3 border-r border-slate-100 text-[10px]">{row.impact}</td>
+                                       <td className="p-3 border-r border-slate-100 text-[10px] italic text-slate-500">Mitigasi perbaikan SOP dan pengawasan berkala...</td>
+                                       
+                                       {/* Inherent */}
+                                       <td className="p-2 text-center bg-blue-50/30 text-[10px] font-bold">{row.inherent.l}</td>
+                                       <td className="p-2 text-center bg-blue-50/30 text-[10px] font-bold">{row.inherent.c}</td>
+                                       <td className="p-2 text-center bg-blue-50/30 text-[10px] font-black">{row.inherent.l * row.inherent.c}</td>
+
+                                       {/* Monitoring */}
+                                       {filters.jenis === 'OPERASIONAL' ? (
+                                           // Map quarters (Mar, Jun, Sep, Des)
+                                           ['mar', 'jun', 'sep', 'des'].map(m => {
+                                               const d = row.monitoring[m] || { l: '-', c: '-' };
+                                               const s = d.l !== '-' ? d.l * d.c : '-';
+                                               return (
+                                                <React.Fragment key={m}>
+                                                    <td className="p-2 text-center border-l border-slate-100 text-[10px]">{d.l}</td>
+                                                    <td className="p-2 text-center text-[10px]">{d.c}</td>
+                                                    <td className="p-2 text-center border-r border-slate-100 text-[10px] font-bold">{s}</td>
+                                                </React.Fragment>
+                                               )
+                                           })
+                                       ) : (
+                                           monthKeys.map(m => {
+                                               const d = row.monitoring[m] || { l: '-', c: '-' };
+                                               const s = d.l !== '-' ? d.l * d.c : '-';
+                                               return (
+                                                <React.Fragment key={m}>
+                                                    <td className="p-2 text-center border-l border-slate-100 text-[10px]">{d.l}</td>
+                                                    <td className="p-2 text-center text-[10px]">{d.c}</td>
+                                                    <td className="p-2 text-center border-r border-slate-100 text-[10px] font-bold">{s}</td>
+                                                </React.Fragment>
+                                               )
+                                           })
+                                       )}
+
+                                       {/* Target */}
+                                       <td className="p-2 text-center bg-emerald-50/30 border-l border-slate-100 text-[10px] font-bold">{row.target.l}</td>
+                                       <td className="p-2 text-center bg-emerald-50/30 text-[10px] font-bold">{row.target.c}</td>
+                                       <td className="p-2 text-center bg-emerald-50/30 text-[10px] font-black">{row.target.l * row.target.c}</td>
                                    </tr>
                                ))}
                           </tbody>
@@ -1098,8 +1266,8 @@ const App = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                      <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
                         <Database size={18} className="text-blue-600" />
-                        Biaya Mitigasi (2025-2026)
-                        <InfoTooltip text="Analisis anggaran biaya mitigasi risiko. Membandingkan Rencana Biaya (OPEX + CAPEX) dengan Realisasi penggunaan anggaran yang berjalan." />
+                        Biaya Mitigasi
+                        <InfoTooltip text="Analisis anggaran biaya mitigasi risiko." />
                      </h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                          <div>
@@ -1495,27 +1663,49 @@ const App = () => {
       {/* MODAL POP-UP */}
       {showModal && selectedCellData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200">
-            <div className="p-6 border-b flex items-center justify-between bg-white">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b flex items-center justify-between bg-white shrink-0">
               <div>
                 <h3 className="text-xl font-black text-slate-800 uppercase leading-none">{selectedCellData.title}</h3>
                 <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">{selectedCellData.subtitle}</p>
               </div>
               <button onClick={() => setShowModal(false)} className="p-2 bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-full transition-all"><X size={20} /></button>
             </div>
-            <div className="p-6 max-h-[60vh] overflow-y-auto space-y-3 bg-slate-50">
-              {selectedCellData.risks.map((risk, idx) => (
-                <div key={idx} className="p-5 bg-white border border-slate-200 rounded-xl hover:border-blue-400 hover:shadow-md transition-all group cursor-pointer">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-mono text-xs font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">{risk.code}</span>
-                    <ExternalLink size={16} className="text-slate-300 group-hover:text-blue-600" />
-                  </div>
-                  <p className="text-sm font-bold text-slate-700 leading-relaxed">{risk.desc}</p>
-                </div>
-              ))}
+            <div className="flex-1 overflow-auto bg-slate-50 p-0">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-100 sticky top-0 z-10 shadow-sm text-[10px] font-black uppercase text-slate-500">
+                  <tr>
+                    <th className="p-4 border-b">Kode</th>
+                    <th className="p-4 border-b">Sasaran Strategis</th>
+                    <th className="p-4 border-b">Aktivitas</th>
+                    <th className="p-4 border-b">Risiko</th>
+                    <th className="p-4 border-b">Sebab</th>
+                    <th className="p-4 border-b">Dampak</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-100 text-xs text-slate-600">
+                  {selectedCellData.risks.map((risk, idx) => (
+                    <tr key={idx} className="hover:bg-blue-50/50 transition-colors">
+                      <td className="p-4 align-top font-mono font-bold text-blue-600">
+                        <a href="#" className="bg-blue-50 px-2 py-1 rounded hover:underline">{risk.code}</a>
+                      </td>
+                      <td className="p-4 align-top">{risk.kategoriRisiko || '-'}</td>
+                      <td className="p-4 align-top">{risk.aktivitasGenerik || '-'}</td>
+                      <td className="p-4 align-top font-bold text-slate-800">{risk.desc}</td>
+                      <td className="p-4 align-top">{risk.cause}</td>
+                      <td className="p-4 align-top">{risk.impact}</td>
+                    </tr>
+                  ))}
+                  {selectedCellData.risks.length === 0 && (
+                     <tr>
+                        <td colSpan="6" className="p-8 text-center text-slate-400 italic">Tidak ada data risiko.</td>
+                     </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-             <div className="p-4 bg-white border-t border-slate-100 text-center">
-                <button onClick={() => setShowModal(false)} className="text-xs font-bold text-slate-500 hover:text-slate-800">Tutup</button>
+             <div className="p-4 bg-white border-t border-slate-100 text-center shrink-0">
+                <button onClick={() => setShowModal(false)} className="px-6 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-600 transition-colors uppercase tracking-wide">Tutup</button>
              </div>
           </div>
         </div>
