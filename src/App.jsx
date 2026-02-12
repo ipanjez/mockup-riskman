@@ -35,6 +35,25 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 
+// --- CONSTANTS ---
+const ORGANIZATION_STRUCTURE = {
+  'Direktorat Operasi': {
+      'Kompartemen Produksi': ['Departemen Operasi', 'Departemen Produksi 1', 'Departemen Produksi 2'],
+      'Kompartemen K3L': ['Departemen K3', 'Departemen Lingkungan Hidup'],
+      'Kompartemen Teknik': ['Departemen Engineering', 'Departemen Pemeliharaan']
+  },
+  'Direktorat Keuangan': {
+      'Kompartemen Keuangan': ['Departemen Keuangan', 'Departemen Anggaran', 'Departemen Akuntansi'],
+      'Kompartemen SDM & Umum': ['Departemen HR', 'Departemen GA', 'Departemen Fasilitas']
+  },
+  'Direktorat Teknik': {
+      'Kompartemen Teknologi Informasi': ['Departemen IT', 'Departemen Digitalisasi'],
+      'Kompartemen Proyek': ['Departemen Proyek A', 'Departemen Proyek B']
+  }
+};
+
+const GRADES = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'TKNO'];
+
 // --- COMPONENTS ---
 const InfoTooltip = ({ text }) => (
   <div className="group relative inline-flex items-center ml-1.5 align-middle">
@@ -46,9 +65,137 @@ const InfoTooltip = ({ text }) => (
   </div>
 );
 
+const HierarchicalFilter = ({ onFilterChange, initialFilters = {}, title = "Filter Data" }) => {
+  const [filters, setFilters] = useState({
+      directorate: '',
+      compartment: '',
+      department: '',
+      grades: GRADES,
+      ...initialFilters
+  });
+
+  const [expanded, setExpanded] = useState(false);
+
+  // Derive options based on selection
+  const compartments = filters.directorate ? Object.keys(ORGANIZATION_STRUCTURE[filters.directorate] || {}) : [];
+  const departments = (filters.directorate && filters.compartment) 
+      ? ORGANIZATION_STRUCTURE[filters.directorate][filters.compartment] || []
+      : [];
+
+  useEffect(() => {
+      onFilterChange(filters);
+  }, [filters]);
+
+  const toggleGrade = (grade) => {
+      setFilters(prev => {
+          const newGrades = prev.grades.includes(grade)
+              ? prev.grades.filter(g => g !== grade)
+              : [...prev.grades, grade];
+          return { ...prev, grades: newGrades };
+      });
+  };
+
+  return (
+      <div className="mb-4 text-[10px]">
+          <button 
+              onClick={() => setExpanded(!expanded)} 
+              className="flex items-center gap-2 font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 transition-colors"
+          >
+              <Filter size={12} />
+              {title}
+              <ChevronDown size={12} className={`transition-transformDuration-200 ${expanded ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {expanded && (
+              <div className="mt-2 p-4 bg-white border border-slate-200 rounded-lg shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2">
+                  <div>
+                      <label className="block font-bold text-slate-500 mb-1">Direktorat</label>
+                      <select 
+                          className="w-full p-2 border border-slate-200 rounded bg-slate-50 outline-none focus:border-blue-500"
+                          value={filters.directorate}
+                          onChange={(e) => setFilters(prev => ({ ...prev, directorate: e.target.value, compartment: '', department: '' }))}
+                      >
+                          <option value="">Semua Direktorat</option>
+                          {Object.keys(ORGANIZATION_STRUCTURE).map(d => (
+                              <option key={d} value={d}>{d}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div>
+                      <label className="block font-bold text-slate-500 mb-1">Kompartemen</label>
+                      <select 
+                          className="w-full p-2 border border-slate-200 rounded bg-slate-50 outline-none focus:border-blue-500"
+                          value={filters.compartment}
+                          onChange={(e) => setFilters(prev => ({ ...prev, compartment: e.target.value, department: '' }))}
+                          disabled={!filters.directorate}
+                      >
+                          <option value="">Semua Kompartemen</option>
+                          {compartments.map(c => (
+                              <option key={c} value={c}>{c}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div>
+                      <label className="block font-bold text-slate-500 mb-1">Departemen</label>
+                      <select 
+                          className="w-full p-2 border border-slate-200 rounded bg-slate-50 outline-none focus:border-blue-500"
+                          value={filters.department}
+                          onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
+                          disabled={!filters.compartment}
+                      >
+                          <option value="">Semua Departemen</option>
+                          {departments.map(d => (
+                              <option key={d} value={d}>{d}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div>
+                      <label className="block font-bold text-slate-500 mb-1">Filter Grade</label>
+                      <div className="relative group">
+                          <button className="w-full text-left p-2 border border-slate-200 rounded bg-slate-50 flex justify-between items-center">
+                              <span>{filters.grades.length === GRADES.length ? 'Semua' : `${filters.grades.length} terpilih`}</span>
+                              <ChevronDown size={10} />
+                          </button>
+                          <div className="hidden group-hover:block absolute top-full left-0 w-full bg-white border border-slate-200 shadow-lg rounded mt-1 p-2 z-50 max-h-40 overflow-y-auto">
+                              {GRADES.map(g => (
+                                  <label key={g} className="flex items-center gap-2 p-1 hover:bg-slate-50 cursor-pointer">
+                                      <input 
+                                          type="checkbox" 
+                                          checked={filters.grades.includes(g)}
+                                          onChange={() => toggleGrade(g)}
+                                          className="rounded text-blue-600 focus:ring-0"
+                                      />
+                                      {g}
+                                  </label>
+                              ))}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          )}
+      </div>
+  );
+};
+
 // --- DATA GENERATOR ---
 const generateDummyData = () => {
-    const units = ['Departemen Lingkungan Hidup', 'Departemen K3', 'Departemen Operasi', 'Departemen HR', 'Departemen Keuangan', 'Departemen IT'];
+    // Helper to find parent units
+    const findUnitDetails = (unitName) => {
+        for (const [dir, comps] of Object.entries(ORGANIZATION_STRUCTURE)) {
+            for (const [comp, depts] of Object.entries(comps)) {
+                if (depts.includes(unitName)) {
+                    return { directorate: dir, compartment: comp };
+                }
+            }
+        }
+        return { directorate: 'Direktorat Operasi', compartment: 'Kompartemen K3L' }; // Fallback
+    };
+
+    const units = [
+        'Departemen Lingkungan Hidup', 'Departemen K3', 'Departemen Operasi', 
+        'Departemen HR', 'Departemen Keuangan', 'Departemen IT',
+        'Departemen Produksi 1', 'Departemen Engineering'
+    ];
     const types = [
         'OPERASIONAL', 'INDIVIDU',
         'ᵖʳᵒʸᵉᵏSoda Ash', 'ᵖʳᵒʸᵉᵏFak-Fak', 'ᵖʳᵒʸᵉᵏNPK-3',
@@ -119,6 +266,8 @@ const generateDummyData = () => {
             }
         });
 
+        const { directorate, compartment } = findUnitDetails(unit);
+
         return {
             id: i + 1,
             code: `R-${period.substring(2)}.${(i + 1).toString().padStart(3, '0')}`,
@@ -133,7 +282,8 @@ const generateDummyData = () => {
             taksonomiRisiko: taksonomiRisiko[Math.floor(Math.random() * taksonomiRisiko.length)],
             grade: grade,
             unitKerja: unit,
-            kompartemen: unit.includes('Operasi') ? 'Kompartemen Operasi' : 'Kompartemen Pendukung',
+            kompartemen: compartment,
+            directorate: directorate,
             periode: period,
             owner: `User ${Math.floor(Math.random() * 50) + 1}`, // Simulated Owner ID
             inherent: { l: inL, c: inC },
@@ -211,10 +361,18 @@ const App = () => {
       jenis: 'OPERASIONAL', 
       periode: 'Semua Periode', 
       unit: 'Semua Unit Kerja',
-      chartCategory: 'Sasaran Generik',
-      chartGrades: ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'] // All selected by default
+      chartCategory: 'Sasaran Generik'
   });
   
+  const [sectionFilters, setSectionFilters] = useState({
+      status: { directorate: '', compartment: '', department: '', grades: GRADES },
+      chart: { directorate: '', compartment: '', department: '', grades: GRADES },
+      map: { directorate: '', compartment: '', department: '', grades: GRADES },
+      stats: { directorate: '', compartment: '', department: '', grades: GRADES },
+      kri: { directorate: '', compartment: '', department: '', grades: GRADES },
+      table: { directorate: '', compartment: '', department: '', grades: GRADES }
+  });
+
   const [rawData] = useState(() => generateDummyData());
 
   // Helper to get period options based on Risk Type
@@ -236,45 +394,60 @@ const App = () => {
       }
       return type;
   };
+  
+  // Helper to filter data by local filters + RBAC
+  const filterData = (data, localFilter) => {
+      if (!localFilter) return data;
 
-  // --- FILTERING LOGIC ---
+      return data.filter(item => {
+          const matchesDir = !localFilter.directorate || item.directorate === localFilter.directorate;
+          const matchesComp = !localFilter.compartment || item.kompartemen === localFilter.compartment;
+          const matchesDept = !localFilter.department || item.unitKerja === localFilter.department;
+          const matchesGrade = !localFilter.grades || localFilter.grades.length === 0 || localFilter.grades.includes(item.grade);
+          
+          return matchesDir && matchesComp && matchesDept && matchesGrade;
+      });
+  };
+
+  // --- FILTERING LOGIC (GLOBAL CONTEXT) ---
   const risksList = useMemo(() => {
       return rawData.filter(item => {
-          // 1. Basic Filters
-          // Removed 'Semua Jenis' logic as it is no longer an option
+          // 1. Basic Filters (Type & Period Only - Unit is now Local)
           const matchesJenis = item.jenisRisiko === filters.jenis;
           
-          // Period logic matching (Simple inclusion for now, can be more complex if needed)
-          const matchesPeriode = filters.periode === 'Semua Periode' || item.periode.includes(filters.periode) || filters.periode.includes('Y1') || filters.periode.includes('Y2'); // Simplified for dummy data
+          const matchesPeriode = filters.periode === 'Semua Periode' || item.periode.includes(filters.periode) || filters.periode.includes('Y1') || filters.periode.includes('Y2'); 
           
+          // Legacy Unit Filter Support (Optional, can be removed if strictly local)
           const matchesUnit = filters.unit === 'Semua Unit Kerja' || item.unitKerja === filters.unit;
           
-          // 2. RBAC & Hierarchy Logic
+          // 2. RBAC Logic
           let hasAccess = false;
-
           const userRoles = currentUser.roles || ['Superadmin'];
           if (userRoles.includes('Superadmin') || userRoles.includes('Admin MRK')) {
               hasAccess = true;
           } else if (userRoles.includes('Karyawan')) {
               hasAccess = item.owner === currentUser.id;
           } else if (userRoles.includes('Viewer')) {
-              hasAccess = true; // Viewer can see all
+              hasAccess = true; 
           }
 
           return matchesJenis && matchesPeriode && matchesUnit && hasAccess;
       });
-  }, [rawData, filters, currentUser]);
+  }, [rawData, filters.jenis, filters.periode, filters.unit, currentUser]);
 
-  // Data for Charts (Updated for dynamic Category)
+  // Derived datasets for each section
+  const statusRisks = useMemo(() => filterData(risksList, sectionFilters.status), [risksList, sectionFilters.status]);
+  const chartRisks = useMemo(() => filterData(risksList, sectionFilters.chart), [risksList, sectionFilters.chart]);
+  const mapRisks = useMemo(() => filterData(risksList, sectionFilters.map), [risksList, sectionFilters.map]);
+  const statsRisks = useMemo(() => filterData(risksList, sectionFilters.stats), [risksList, sectionFilters.stats]);
+  const kriRisks = useMemo(() => filterData(risksList, sectionFilters.kri), [risksList, sectionFilters.kri]);
+  const tableRisks = useMemo(() => filterData(risksList, sectionFilters.table), [risksList, sectionFilters.table]);
+
+  // Data for Charts (Updated to use chartRisks)
   const chartData = useMemo(() => {
-      // Group by Category (Sasaran Generik, etc)
       const grouped = {};
       
-      risksList.forEach(r => {
-          // Filter by Grade
-          if (filters.chartGrades.length > 0 && !filters.chartGrades.includes(r.grade)) return;
-
-          // Use the selected category field.
+      chartRisks.forEach(r => { 
           let key = '';
           if (filters.chartCategory === 'Sasaran Generik') key = r.kategoriRisiko;
           else if (filters.chartCategory === 'Aktivitas Generik') key = r.aktivitasGenerik;
@@ -290,18 +463,21 @@ const App = () => {
               'Moderate to High': 0, 
               'Moderate': 0, 
               'Low to Moderate': 0, 
-              'Low': 0 
+              'Low': 0,
+              total: 0
           };
           
           const score = r.residual.l * r.residual.c;
           const level = getLevelLabel(score);
           if (grouped[key][level] !== undefined) {
               grouped[key][level]++;
+              grouped[key].total++;
           }
       });
 
-      return Object.values(grouped);
-  }, [risksList, filters.chartCategory, filters.chartGrades]);
+      return Object.values(grouped).filter(item => item.total > 0).sort((a,b) => b.total - a.total);
+  }, [chartRisks, filters.chartCategory]);
+
 
   // --- LOGIC TAMBAHAN DEPENDENT ON RISKS LIST ---
 
@@ -413,7 +589,7 @@ const App = () => {
   const monthKeys = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 'jul', 'agt', 'sep', 'okt', 'nov', 'des'];
 
   // Fill in monitoring data for 2026
-  const tableData = risksList; 
+  const tableData = tableRisks; 
 
   const filteredTable = useMemo(() => {
     let result = [...tableData].filter(item => {
@@ -787,7 +963,7 @@ const App = () => {
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 
                 {/* 1. ADVANCED FILTER SECTION */}
-                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
+                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-5 items-end">
                     <div className="relative">
                         <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
                             <Layers size={12} /> Jenis Pengelolaan Risiko
@@ -847,31 +1023,16 @@ const App = () => {
                         </select>
                         <ChevronDown size={14} className="absolute right-3 bottom-3.5 text-slate-400 pointer-events-none" />
                     </div>
-
-                    <div className="relative">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
-                            <Users size={12} /> Unit Kerja
-                            <InfoTooltip text="Filter unit kerja atau departemen pemilik risiko." />
-                        </label>
-                        <select 
-                            value={filters.unit}
-                            onChange={(e) => setFilters({...filters, unit: e.target.value})}
-                            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
-                        >
-                            <option>Semua Unit Kerja</option>
-                            <option>Departemen Lingkungan Hidup</option>
-                            <option>Departemen K3</option>
-                            <option>Departemen Operasi</option>
-                            <option>Departemen HR</option>
-                            <option>Departemen Keuangan</option>
-                            <option>Departemen IT</option>
-                        </select>
-                        <ChevronDown size={14} className="absolute right-3 bottom-3.5 text-slate-400 pointer-events-none" />
-                    </div>
                 </div>
 
                 {/* 2. SUMMARY STATISTICS */}
                 <div className="space-y-4">
+                     {/* Local Filter for Stats */}
+                     <HierarchicalFilter 
+                        title="Filter Statistik Status Status"
+                        onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, status: f }))} 
+                     />
+                    
                     {/* Row 1: Totals */}
                     <div className="grid grid-cols-2 gap-4">
                         <div onClick={() => handleStatusClick('Aktif')} className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-5 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform">
@@ -880,7 +1041,7 @@ const App = () => {
                                    Total Risiko Aktif
                                    <InfoTooltip text="Jumlah risiko yang masih aktif (Selain Draft)." />
                                </p>
-                               <h3 className="text-4xl font-black tracking-tight">{activeRisksCount}</h3>
+                               <h3 className="text-4xl font-black tracking-tight">{statusRisks.filter(r => r.status !== 'Draft').length}</h3>
                            </div>
                            <ActivityIcon size={48} className="text-blue-500 opacity-40 absolute right-4 bottom-[-10px] group-hover:scale-110 transition-transform" />
                         </div>
@@ -890,7 +1051,7 @@ const App = () => {
                                    Total Risiko Inaktif
                                    <InfoTooltip text="Jumlah risiko yang telah selesai monitoring (Selesai Monitoring)." />
                                </p>
-                               <h3 className="text-4xl font-black tracking-tight text-slate-800">{inactiveRisksCount}</h3>
+                               <h3 className="text-4xl font-black tracking-tight text-slate-800">{statusRisks.filter(r => r.status === 'Selesai Monitoring').length}</h3>
                            </div>
                            <CheckCircle size={48} className="text-slate-200 absolute right-4 bottom-[-10px] group-hover:scale-110 transition-transform" />
                         </div>
@@ -902,17 +1063,17 @@ const App = () => {
                             Register Risk Status
                             <InfoTooltip text="Status dokumen pendaftaran risiko baru. Mulai dari Draft hingga berbagai tahapan approval." />
                         </h4>
-                        <div className="grid grid-cols-2 lg:flex lg:flex-nowrap gap-3 min-w-max">
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                             {[
-                                { l: 'Baru', c: risksList.filter(r => r.status === 'Baru').length, color: 'bg-blue-50 text-blue-600' },
-                                { l: 'Draft', c: risksList.filter(r => r.status === 'Draft').length, color: 'bg-slate-100 text-slate-600' },
-                                { l: 'Revisi', c: risksList.filter(r => r.status === 'Revisi').length, color: 'bg-red-50 text-red-600' },
-                                { l: 'Menunggu Approval VP/PM Unit Kerja', c: risksList.filter(r => r.status === 'Menunggu Approval VP/PM Unit Kerja').length, color: 'bg-orange-50 text-orange-600' },
-                                { l: 'Menunggu Approval SVP Unit Kerja', c: risksList.filter(r => r.status === 'Menunggu Approval SVP Unit Kerja').length, color: 'bg-orange-50 text-orange-600' },
-                                { l: 'Menunggu Approval VP MRK', c: risksList.filter(r => r.status === 'Menunggu Approval VP MRK').length, color: 'bg-orange-50 text-orange-600' },
-                                { l: 'Menunggu Approval SVP TKMR', c: risksList.filter(r => r.status === 'Menunggu Approval SVP TKMR').length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Draft', c: statusRisks.filter(r => r.status === 'Draft').length, color: 'bg-slate-100 text-slate-600' },
+                                { l: 'Revisi', c: statusRisks.filter(r => r.status === 'Revisi').length, color: 'bg-red-50 text-red-600' },
+                                { l: 'Menunggu Approval VP/PM Unit Kerja', c: statusRisks.filter(r => r.status === 'Menunggu Approval VP/PM Unit Kerja').length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Menunggu Approval SVP Unit Kerja', c: statusRisks.filter(r => r.status === 'Menunggu Approval SVP Unit Kerja').length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Menunggu Approval VP MRK', c: statusRisks.filter(r => r.status === 'Menunggu Approval VP MRK').length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Menunggu Approval SVP TKMR', c: statusRisks.filter(r => r.status === 'Menunggu Approval SVP TKMR').length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Baru', c: statusRisks.filter(r => r.status === 'Baru').length, color: 'bg-blue-50 text-blue-600' },
                             ].map((stat, i) => (
-                                <div key={i} onClick={() => handleStatusClick(stat.l)} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/10 transition-all flex flex-col items-center min-w-[140px] cursor-pointer group hover:shadow-sm relative`}>
+                                <div key={i} onClick={() => handleStatusClick(stat.l)} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/10 transition-all flex flex-col items-center min-w-[140px] cursor-pointer group hover:shadow-sm relative w-full`}>
                                     <span className="text-2xl font-black mb-1">{stat.c}</span>
                                     <span className="text-[9px] font-bold text-center uppercase leading-tight opacity-80 line-clamp-2">{stat.l}</span>
                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -929,18 +1090,18 @@ const App = () => {
                              Monitoring Risk Status
                              <InfoTooltip text="Status dokumen pemantauan (monitoring) risiko berkala." />
                          </h4>
-                         <div className="grid grid-cols-2 lg:flex lg:flex-nowrap gap-3 min-w-max">
+                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                             {[
-                                { l: 'Berjalan', c: risksList.filter(r => r.status === 'Berjalan').length, color: 'bg-emerald-50 text-emerald-600' },
-                                { l: 'Revisi Monitoring', c: risksList.filter(r => r.status === 'Revisi Monitoring').length, color: 'bg-red-50 text-red-600' },
-                                { l: 'Menunggu Approval Monitoring VP/PM Unit Kerja', c: risksList.filter(r => r.status === 'Menunggu Approval Monitoring VP/PM Unit Kerja').length, color: 'bg-amber-50 text-amber-600' },
-                                { l: 'Menunggu Approval Monitoring SVP Unit Kerja', c: risksList.filter(r => r.status === 'Menunggu Approval Monitoring SVP Unit Kerja').length, color: 'bg-amber-50 text-amber-600' },
-                                { l: 'Menunggu Approval Monitoring Staff MRK', c: risksList.filter(r => r.status === 'Menunggu Approval Monitoring Staff MRK').length, color: 'bg-amber-50 text-amber-600' },
-                                { l: 'Menunggu Approval Monitoring VP MRK', c: risksList.filter(r => r.status === 'Menunggu Approval Monitoring VP MRK').length, color: 'bg-amber-50 text-amber-600' },
-                                { l: 'Menunggu Approval Monitoring SVP TKMR', c: risksList.filter(r => r.status === 'Menunggu Approval Monitoring SVP TKMR').length, color: 'bg-amber-50 text-amber-600' },
-                                { l: 'Selesai Monitoring', c: risksList.filter(r => r.status === 'Selesai Monitoring').length, color: 'bg-blue-50 text-blue-600' },
+                                { l: 'Berjalan', c: statusRisks.filter(r => r.status === 'Berjalan').length, color: 'bg-emerald-50 text-emerald-600' },
+                                { l: 'Revisi Monitoring', c: statusRisks.filter(r => r.status === 'Revisi Monitoring').length, color: 'bg-red-50 text-red-600' },
+                                { l: 'Menunggu Approval Monitoring VP/PM Unit Kerja', c: statusRisks.filter(r => r.status === 'Menunggu Approval Monitoring VP/PM Unit Kerja').length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Approval Monitoring SVP Unit Kerja', c: statusRisks.filter(r => r.status === 'Menunggu Approval Monitoring SVP Unit Kerja').length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Approval Monitoring Staff MRK', c: statusRisks.filter(r => r.status === 'Menunggu Approval Monitoring Staff MRK').length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Approval Monitoring VP MRK', c: statusRisks.filter(r => r.status === 'Menunggu Approval Monitoring VP MRK').length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Approval Monitoring SVP TKMR', c: statusRisks.filter(r => r.status === 'Menunggu Approval Monitoring SVP TKMR').length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Selesai Monitoring', c: statusRisks.filter(r => r.status === 'Selesai Monitoring').length, color: 'bg-blue-50 text-blue-600' },
                             ].map((stat, i) => (
-                                <div key={i} onClick={() => handleStatusClick(stat.l)} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/10 transition-all flex flex-col items-center min-w-[140px] cursor-pointer group hover:shadow-sm relative`}>
+                                <div key={i} onClick={() => handleStatusClick(stat.l)} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/10 transition-all flex flex-col items-center min-w-[140px] cursor-pointer group hover:shadow-sm relative w-full`}>
                                     <span className="text-2xl font-black mb-1">{stat.c}</span>
                                     <span className="text-[9px] font-bold text-center uppercase leading-tight opacity-80 line-clamp-2">{stat.l}</span>
                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -964,32 +1125,6 @@ const App = () => {
                              <p className="text-xs text-slate-400 mt-1">Distribusi level risiko residual per kategori yang dipilih.</p>
                         </div>
                         <div className="flex gap-3 items-center">
-                             {/* Grade Filter Dropdown with Checkboxes */}
-                             <div className="relative group">
-                                <button className="flex items-center gap-2 text-[10px] font-bold bg-slate-50 border border-slate-200 rounded px-3 py-2 hover:bg-slate-100">
-                                    <Filter size={12} />
-                                    Filter Grade ({filters.chartGrades.length})
-                                </button>
-                                <div className="hidden group-hover:block absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 shadow-xl rounded-lg p-2 z-50">
-                                    {['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'TKNO'].map(g => (
-                                        <label key={g} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer text-[10px] font-bold text-slate-600">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={filters.chartGrades.includes(g)}
-                                                onChange={(e) => {
-                                                    const newGrades = e.target.checked 
-                                                        ? [...filters.chartGrades, g]
-                                                        : filters.chartGrades.filter(item => item !== g);
-                                                    setFilters({...filters, chartGrades: newGrades});
-                                                }}
-                                                className="rounded border-slate-300 text-blue-600 focus:ring-0 w-3 h-3"
-                                            />
-                                            {g}
-                                        </label>
-                                    ))}
-                                </div>
-                             </div>
-
                              <select 
                                 value={filters.chartCategory}
                                 onChange={(e) => setFilters({...filters, chartCategory: e.target.value})}
@@ -1002,6 +1137,12 @@ const App = () => {
                              </select>
                         </div>
                     </div>
+                    
+                    <HierarchicalFilter 
+                        title="Filter Grafik"
+                        onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, chart: f }))} 
+                    />
+
                     <div className="h-[350px] w-full">
                          <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -1015,83 +1156,169 @@ const App = () => {
                                     itemStyle={{fontSize: '10px', padding: '2px 0'}}
                                 />
                                 <Legend wrapperStyle={{paddingTop: '20px', fontSize: '10px'}} iconSize={8} />
-                                <Bar dataKey="High" name="High" stackId="a" fill="#dc2626" barSize={40} onClick={(data) => handleChartBarClick(data, 'High')} className="cursor-pointer hover:opacity-80" />
-                                <Bar dataKey="Moderate to High" name="Moderate to High" stackId="a" fill="#f97316" barSize={40} onClick={(data) => handleChartBarClick(data, 'Moderate to High')} className="cursor-pointer hover:opacity-80" />
-                                <Bar dataKey="Moderate" name="Moderate" stackId="a" fill="#eab308" barSize={40} onClick={(data) => handleChartBarClick(data, 'Moderate')} className="cursor-pointer hover:opacity-80" />
+                                <Bar dataKey="Low" name="Low" stackId="a" fill="#059669" barSize={40} onClick={(data) => handleChartBarClick(data, 'Low')} className="cursor-pointer hover:opacity-80" />
                                 <Bar dataKey="Low to Moderate" name="Low to Moderate" stackId="a" fill="#84cc16" barSize={40} onClick={(data) => handleChartBarClick(data, 'Low to Moderate')} className="cursor-pointer hover:opacity-80" />
-                                <Bar dataKey="Low" name="Low" stackId="a" fill="#059669" barSize={40} radius={[4, 4, 0, 0]} onClick={(data) => handleChartBarClick(data, 'Low')} className="cursor-pointer hover:opacity-80" />
+                                <Bar dataKey="Moderate" name="Moderate" stackId="a" fill="#eab308" barSize={40} onClick={(data) => handleChartBarClick(data, 'Moderate')} className="cursor-pointer hover:opacity-80" />
+                                <Bar dataKey="Moderate to High" name="Moderate to High" stackId="a" fill="#f97316" barSize={40} onClick={(data) => handleChartBarClick(data, 'Moderate to High')} className="cursor-pointer hover:opacity-80" />
+                                <Bar dataKey="High" name="High" stackId="a" fill="#dc2626" barSize={40} radius={[4, 4, 0, 0]} onClick={(data) => handleChartBarClick(data, 'High')} className="cursor-pointer hover:opacity-80" />
                             </BarChart>
                          </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* 4. RISK MAP (Peta Risiko) & PERCENTAGE COMPLETION */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Heatmap (2/3 width) */}
-                    <div className="lg:col-span-2">
-                        <RiskMatrix title="Peta Risiko Residual (Global)" type="residual" data={risksList} />
+                {/* 4. RISK MAP SECTION */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                           <AlertTriangle className="text-blue-600" />
+                           Peta Risiko
+                        </h3>
+                    </div>
+                    
+                    <HierarchicalFilter 
+                        title="Filter Peta Risiko"
+                        onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, map: f }))} 
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 h-[400px]">
+                        <RiskMatrix title="Inherent" type="inherent" data={mapRisks} />
+                        <RiskMatrix title="Residual" type="residual" data={mapRisks} />
+                        <RiskMatrix title="Target" type="target" data={mapRisks} />
+                    </div>
+                </div>
+
+                {/* 5. STATISTIK KELENGKAPAN & KRI */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* 5A. KELENGKAPAN */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                         <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                               <PieChart className="text-blue-600" />
+                               Statistik Kelengkapan
+                            </h3>
+                         </div>
+                         <HierarchicalFilter 
+                            title="Filter Kelengkapan"
+                            onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, stats: f }))} 
+                         />
+                         
+                         <div className="space-y-6 mt-4">
+                            {/* 1. Kelengkapan Jumlah Risiko */}
+                            <div>
+                                <h4 className="text-xs font-bold text-slate-600 mb-2">Kelengkapan Jumlah Risiko</h4>
+                                {['Departemen K3', 'Departemen Lingkungan Hidup', 'Departemen Operasi'].map((dept, i) => {
+                                    const total = 50; // Mock target
+                                    const filled = statsRisks.filter(r => r.unitKerja === dept).length;
+                                    const pct = Math.min(100, Math.round((filled / total) * 100));
+                                    return (
+                                        <div key={i} className="mb-2">
+                                            <div className="flex justify-between text-[10px] mb-1">
+                                                <span>{dept}</span>
+                                                <span className="font-bold">{pct}% ({filled}/{total})</span>
+                                            </div>
+                                            <div className="h-1.5 w-full bg-slate-100 rounded-full">
+                                                <div className="h-full bg-blue-500 rounded-full" style={{width: `${pct}%`}}></div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                            
+                            {/* 2. Persentase Pengisi (Employee) */}
+                             <div>
+                                <h4 className="text-xs font-bold text-slate-600 mb-2">Partisipasi Karyawan (Pengisi)</h4>
+                                {/* Mock Data */}
+                                {['Departemen K3', 'Departemen HR'].map((dept, i) => (
+                                    <div key={i} className="mb-2">
+                                        <div className="flex justify-between text-[10px] mb-1">
+                                            <span>{dept}</span>
+                                            <span className="font-bold text-emerald-600">100%</span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-slate-100 rounded-full">
+                                            <div className="h-full bg-emerald-500 rounded-full" style={{width: '100%'}}></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* 3. Kelengkapan Monitoring */}
+                             <div>
+                                <h4 className="text-xs font-bold text-slate-600 mb-2">Kelengkapan Monitoring</h4>
+                                {['Departemen K3', 'Departemen Lingkungan Hidup'].map((dept, i) => {
+                                     const count = statsRisks.filter(r => r.unitKerja === dept && r.status === 'Berjalan').length;
+                                     return (
+                                        <div key={i} className="flex justify-between items-center text-[10px] py-1 border-b border-slate-50">
+                                            <span>{dept}</span>
+                                            <span className="font-bold bg-blue-50 text-blue-600 px-2 rounded-full">{count} Dokumen</span>
+                                        </div>
+                                     )
+                                })}
+                            </div>
+                         </div>
                     </div>
 
-                    {/* Completion Stats (1/3 width) */}
-                    <div className="flex flex-col gap-4">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex-1">
-                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                <PieChart size={18} className="text-blue-600" />
-                                Kelengkapan Pengisian
-                                <InfoTooltip text="Persentase kelengkapan pengisian data risiko per unit kerja." />
+                    {/* 5B. KEY RISK INDICATOR (KRI) */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                         <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                               <Activity className="text-blue-600" />
+                               Rekapitulasi Key Risk Indicator (KRI)
                             </h3>
-                            
-                            <div className="space-y-4">
-                                {['Departemen K3', 'Departemen Lingkungan Hidup', 'Departemen Operasi', 'Departemen HR', 'Departemen IT'].map((dept, i) => {
-                                    const pct = [100, 85, 92, 78, 88][i]; // Static mock
-                                    const filled = [340, 255, 184, 156, 44][i];
-                                    const total = [340, 300, 200, 200, 50][i];
-                                    return (
-                                        <div key={i}>
-                                            <div className="flex justify-between text-xs mb-1">
-                                                <span className="font-bold text-slate-600">{dept}</span>
-                                                <span className={`font-black ${pct < 80 ? 'text-orange-500' : 'text-green-600'}`}>{pct}%</span>
-                                            </div>
-                                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                <div className={`h-full rounded-full ${pct < 80 ? 'bg-orange-400' : 'bg-green-500'}`} style={{width: `${pct}%`}}></div>
-                                            </div>
-                                            <p className="text-[9px] text-slate-400 mt-1">{filled} dari {total} Risiko Teridentifikasi</p>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex-1">
-                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                <Activity size={18} className="text-blue-600" />
-                                Kelengkapan Monitoring
-                                <InfoTooltip text="Jumlah risiko dengan status 'Berjalan' per unit kerja." />
-                            </h3>
-                            <div className="space-y-3">
-                                {['Departemen K3', 'Departemen Lingkungan Hidup', 'Departemen Operasi', 'Departemen HR'].map((dept, i) => {
-                                    const count = risksList.filter(r => r.unitKerja === dept && r.status === 'Berjalan').length;
-                                    return (
-                                        <div key={i} className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
-                                            <span className="text-[10px] font-bold text-slate-600">{dept}</span>
-                                            <span className="text-xs font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">{count} Berjalan</span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
+                         </div>
+                         <HierarchicalFilter 
+                            title="Filter KRI"
+                            onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, kri: f }))} 
+                         />
+                         
+                         <div className="overflow-x-auto mt-4">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase">
+                                    <tr>
+                                        <th className="p-2 border-b">KRI</th>
+                                        <th className="p-2 border-b">Satuan</th>
+                                        <th className="p-2 border-b">Periode</th>
+                                        <th className="p-2 border-b">Realisasi</th>
+                                        <th className="p-2 border-b">Kriteria</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-xs">
+                                    {kriRisks.slice(0, 5).map((r, i) => (
+                                        <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
+                                            <td className="p-2 truncate max-w-[150px]">KRI - {r.code}</td>
+                                            <td className="p-2 text-slate-400">%</td>
+                                            <td className="p-2">{r.periode}</td>
+                                            <td className="p-2 font-bold">{Math.floor(Math.random() * 100)}</td>
+                                            <td className="p-2">
+                                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                                                    i % 3 === 0 ? 'bg-green-100 text-green-700' : 
+                                                    i % 3 === 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                                                }`}>
+                                                    {i % 3 === 0 ? 'AMAN' : i % 3 === 1 ? 'WASPADA' : 'BAHAYA'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                         </div>
                     </div>
                 </div>
 
                 {/* 5. MONITORING TABLE */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                   <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                       <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                          <Layers size={18} className="text-blue-600" />
-                          Rekapitulasi Risiko
-                          <InfoTooltip text="Daftar risiko yang sesuai dengan kriteria filter." />
-                       </h3>
-                       <button onClick={handleMonitoringExport} className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors border border-blue-100 flex items-center gap-2">
+                   <div className="p-5 border-b border-slate-100 flex justify-between items-start bg-white sticky top-0 z-10">
+                       <div className="flex-1">
+                           <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-2">
+                              <Layers size={18} className="text-blue-600" />
+                              Rekapitulasi Risiko
+                              <InfoTooltip text="Daftar risiko yang sesuai dengan kriteria filter." />
+                           </h3>
+                           <HierarchicalFilter 
+                                title="Filter Tabel"
+                                onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, table: f }))} 
+                           />
+                       </div>
+                       <button onClick={handleMonitoringExport} className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors border border-blue-100 flex items-center gap-2 mt-2">
                           <Download size={14} /> Export CSV
                        </button>
                    </div>
@@ -1304,9 +1531,8 @@ const App = () => {
                          <p className="text-blue-100 text-sm font-medium opacity-90 max-w-xl">Menampilkan statistik mendalam mengenai profil risiko perusahaan.</p>
                          
                          <div className="flex gap-6 mt-8">
-                             <button onClick={() => setActiveTab('Dashboard Admin')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Dashboard Admin</button>
+                             <button onClick={() => setActiveTab('Dashboard')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Dashboard</button>
                              <button className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'Informasi Dashboard' ? 'border-white text-white' : 'border-transparent text-blue-200 hover:text-white'}`}>Informasi Dashboard</button>
-                             <button onClick={() => setActiveTab('Individu')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Individu</button>
                          </div>
                      </div>
     
