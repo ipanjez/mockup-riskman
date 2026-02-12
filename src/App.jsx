@@ -65,35 +65,82 @@ const InfoTooltip = ({ text }) => (
   </div>
 );
 
+const CheckboxGroup = ({ label, options, selected, onChange }) => (
+    <div className="mb-2">
+        <label className="block font-bold text-slate-500 mb-1">{label}</label>
+        <div className="relative group">
+            <button className="w-full text-left p-2 border border-slate-200 rounded bg-slate-50 flex justify-between items-center text-[10px] min-h-[32px]">
+                <span className="truncate">{selected.length === options.length ? 'Semua' : selected.length === 0 ? 'Pilih...' : `${selected.length} terpilih`}</span>
+                <ChevronDown size={10} />
+            </button>
+            <div className="hidden group-hover:block absolute top-full left-0 w-full bg-white border border-slate-200 shadow-lg rounded mt-1 p-2 z-50 max-h-40 overflow-y-auto">
+                {options.map(opt => (
+                    <label key={opt} className="flex items-center gap-2 p-1 hover:bg-slate-50 cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            checked={selected.includes(opt)}
+                            onChange={() => {
+                                const newSelected = selected.includes(opt)
+                                    ? selected.filter(s => s !== opt)
+                                    : [...selected, opt];
+                                onChange(newSelected);
+                            }}
+                            className="rounded text-blue-600 focus:ring-0 w-3 h-3"
+                        />
+                        <span className="text-[10px]">{opt}</span>
+                    </label>
+                ))}
+            </div>
+        </div>
+    </div>
+);
+
 const HierarchicalFilter = ({ onFilterChange, initialFilters = {}, title = "Filter Data" }) => {
   const [filters, setFilters] = useState({
-      directorate: '',
-      compartment: '',
-      department: '',
+      directorate: [], // Array for checklist
+      compartment: [], // Array
+      department: [], // Array
       grades: GRADES,
+      level: [], // Added for recap table
       ...initialFilters
   });
 
   const [expanded, setExpanded] = useState(false);
 
   // Derive options based on selection
-  const compartments = filters.directorate ? Object.keys(ORGANIZATION_STRUCTURE[filters.directorate] || {}) : [];
-  const departments = (filters.directorate && filters.compartment) 
-      ? ORGANIZATION_STRUCTURE[filters.directorate][filters.compartment] || []
-      : [];
+  const directorates = Object.keys(ORGANIZATION_STRUCTURE);
+  
+  const compartments = useMemo(() => {
+     let comps = [];
+     const sourceDirs = filters.directorate.length > 0 ? filters.directorate : directorates;
+     sourceDirs.forEach(d => {
+         if (ORGANIZATION_STRUCTURE[d]) {
+             comps = [...comps, ...Object.keys(ORGANIZATION_STRUCTURE[d])];
+         }
+     });
+     return [...new Set(comps)];
+  }, [filters.directorate]);
+
+  const departments = useMemo(() => {
+     let depts = [];
+     const sourceDirs = filters.directorate.length > 0 ? filters.directorate : directorates;
+     sourceDirs.forEach(d => {
+         const dirObj = ORGANIZATION_STRUCTURE[d];
+         if (dirObj) {
+            const sourceComps = filters.compartment.length > 0 ? filters.compartment : Object.keys(dirObj);
+            sourceComps.forEach(c => {
+                if (dirObj[c]) {
+                    depts = [...depts, ...dirObj[c]];
+                }
+            });
+         }
+     });
+     return [...new Set(depts)];
+  }, [filters.directorate, filters.compartment]);
 
   useEffect(() => {
       onFilterChange(filters);
   }, [filters]);
-
-  const toggleGrade = (grade) => {
-      setFilters(prev => {
-          const newGrades = prev.grades.includes(grade)
-              ? prev.grades.filter(g => g !== grade)
-              : [...prev.grades, grade];
-          return { ...prev, grades: newGrades };
-      });
-  };
 
   return (
       <div className="mb-4 text-[10px]">
@@ -103,74 +150,48 @@ const HierarchicalFilter = ({ onFilterChange, initialFilters = {}, title = "Filt
           >
               <Filter size={12} />
               {title}
-              <ChevronDown size={12} className={`transition-transformDuration-200 ${expanded ? 'rotate-180' : ''}`} />
+              <ChevronDown size={12} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
           </button>
           
           {expanded && (
               <div className="mt-2 p-4 bg-white border border-slate-200 rounded-lg shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2">
-                  <div>
-                      <label className="block font-bold text-slate-500 mb-1">Direktorat</label>
-                      <select 
-                          className="w-full p-2 border border-slate-200 rounded bg-slate-50 outline-none focus:border-blue-500"
-                          value={filters.directorate}
-                          onChange={(e) => setFilters(prev => ({ ...prev, directorate: e.target.value, compartment: '', department: '' }))}
-                      >
-                          <option value="">Semua Direktorat</option>
-                          {Object.keys(ORGANIZATION_STRUCTURE).map(d => (
-                              <option key={d} value={d}>{d}</option>
-                          ))}
-                      </select>
-                  </div>
-                  <div>
-                      <label className="block font-bold text-slate-500 mb-1">Kompartemen</label>
-                      <select 
-                          className="w-full p-2 border border-slate-200 rounded bg-slate-50 outline-none focus:border-blue-500"
-                          value={filters.compartment}
-                          onChange={(e) => setFilters(prev => ({ ...prev, compartment: e.target.value, department: '' }))}
-                          disabled={!filters.directorate}
-                      >
-                          <option value="">Semua Kompartemen</option>
-                          {compartments.map(c => (
-                              <option key={c} value={c}>{c}</option>
-                          ))}
-                      </select>
-                  </div>
-                  <div>
-                      <label className="block font-bold text-slate-500 mb-1">Departemen</label>
-                      <select 
-                          className="w-full p-2 border border-slate-200 rounded bg-slate-50 outline-none focus:border-blue-500"
-                          value={filters.department}
-                          onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
-                          disabled={!filters.compartment}
-                      >
-                          <option value="">Semua Departemen</option>
-                          {departments.map(d => (
-                              <option key={d} value={d}>{d}</option>
-                          ))}
-                      </select>
-                  </div>
-                  <div>
-                      <label className="block font-bold text-slate-500 mb-1">Filter Grade</label>
-                      <div className="relative group">
-                          <button className="w-full text-left p-2 border border-slate-200 rounded bg-slate-50 flex justify-between items-center">
-                              <span>{filters.grades.length === GRADES.length ? 'Semua' : `${filters.grades.length} terpilih`}</span>
-                              <ChevronDown size={10} />
-                          </button>
-                          <div className="hidden group-hover:block absolute top-full left-0 w-full bg-white border border-slate-200 shadow-lg rounded mt-1 p-2 z-50 max-h-40 overflow-y-auto">
-                              {GRADES.map(g => (
-                                  <label key={g} className="flex items-center gap-2 p-1 hover:bg-slate-50 cursor-pointer">
-                                      <input 
-                                          type="checkbox" 
-                                          checked={filters.grades.includes(g)}
-                                          onChange={() => toggleGrade(g)}
-                                          className="rounded text-blue-600 focus:ring-0"
-                                      />
-                                      {g}
-                                  </label>
-                              ))}
-                          </div>
-                      </div>
-                  </div>
+                  <CheckboxGroup 
+                      label="Direktorat" 
+                      options={directorates} 
+                      selected={filters.directorate} 
+                      onChange={(val) => setFilters(prev => ({ ...prev, directorate: val, compartment: [], department: [] }))} 
+                  />
+                  <CheckboxGroup 
+                      label="Kompartemen" 
+                      options={compartments} 
+                      selected={filters.compartment} 
+                      onChange={(val) => setFilters(prev => ({ ...prev, compartment: val, department: [] }))} 
+                  />
+                  <CheckboxGroup 
+                      label="Departemen" 
+                      options={departments} 
+                      selected={filters.department} 
+                      onChange={(val) => setFilters(prev => ({ ...prev, department: val }))} 
+                  />
+                  
+                  {/* Grade Filter */}
+                  <CheckboxGroup 
+                      label="Filter Grade" 
+                      options={GRADES} 
+                      selected={filters.grades} 
+                      onChange={(val) => setFilters(prev => ({ ...prev, grades: val }))} 
+                  />
+
+                  {/* Optional Level Filter (rendered conditionally if enabled in props? Or just always present but ignored if not needed? 
+                      The user specifically asked for "Rekapitulasi Risiko ... dapat difilter checklist >=1 level risikonya".
+                      To keep it simple, I'll add it here and use it where applicable.
+                  ) */}
+                  <CheckboxGroup 
+                      label="Level Risiko" 
+                      options={['Low', 'Low to Moderate', 'Moderate', 'Moderate to High', 'High']} 
+                      selected={filters.level || []} 
+                      onChange={(val) => setFilters(prev => ({ ...prev, level: val }))} 
+                  />
               </div>
           )}
       </div>
@@ -351,9 +372,10 @@ const App = () => {
   const [currentUser, setCurrentUser] = useState({ 
       id: 'User 1', 
       roles: ['Superadmin'], // Multiple roles support
+      jabatan: 'AVP', // Default Job Title
       name: 'Farhan Jezando', 
       unit: 'Departemen K3', 
-      kompartemen: 'Kompartemen Operasi',
+      kompartemen: 'Kompartemen K3L', // Fixed matching context
       assignedRiskTypes: ['ISO 27001 SMKI'] // For PIC SISMEN
   });
   
@@ -365,15 +387,32 @@ const App = () => {
   });
   
   const [sectionFilters, setSectionFilters] = useState({
-      status: { directorate: '', compartment: '', department: '', grades: GRADES },
-      chart: { directorate: '', compartment: '', department: '', grades: GRADES },
-      map: { directorate: '', compartment: '', department: '', grades: GRADES },
-      stats: { directorate: '', compartment: '', department: '', grades: GRADES },
-      kri: { directorate: '', compartment: '', department: '', grades: GRADES },
-      table: { directorate: '', compartment: '', department: '', grades: GRADES }
+      status: { directorate: [], compartment: [], department: [], grades: GRADES, level: [] },
+      chart: { directorate: [], compartment: [], department: [], grades: GRADES, level: [] },
+      map: { directorate: [], compartment: [], department: [], grades: GRADES, level: [] },
+      stats: { directorate: [], compartment: [], department: [], grades: GRADES, level: [] },
+      kri: { directorate: [], compartment: [], department: [], grades: GRADES, level: [] },
+      table: { directorate: [], compartment: [], department: [], grades: GRADES, level: [] }
   });
 
   const [rawData] = useState(() => generateDummyData());
+
+  // Helper visibility Check
+  const showFilters = useMemo(() => {
+     const roles = currentUser.roles || [];
+     const jabatan = currentUser.jabatan || '';
+     
+     // "untuk seluruh filter di dashboard akan hilang jika rolenya karyawan atau admin data, sisanya akan muncul."
+     // Interpretation: Hidden if (Karyawan OR Admin Data) UNLESS Jabatan is Atasan
+     
+     const isKaryawanOrAdminData = roles.includes('Karyawan') || roles.includes('Admin Data');
+     const isAtasan = ['AVP', 'VP', 'SVP', 'PM'].some(j => jabatan.includes(j));
+     
+     if (roles.includes('Superadmin') || roles.includes('Admin MRK')) return true;
+     if (isKaryawanOrAdminData && !isAtasan) return false;
+     
+     return true; // Default show (e.g. Atasan will see it)
+  }, [currentUser]);
 
   // Helper to get period options based on Risk Type
   const getPeriodOptions = (type) => {
@@ -400,38 +439,63 @@ const App = () => {
       if (!localFilter) return data;
 
       return data.filter(item => {
-          const matchesDir = !localFilter.directorate || item.directorate === localFilter.directorate;
-          const matchesComp = !localFilter.compartment || item.kompartemen === localFilter.compartment;
-          const matchesDept = !localFilter.department || item.unitKerja === localFilter.department;
+          const matchesDir = !localFilter.directorate || localFilter.directorate.length === 0 || localFilter.directorate.includes(item.directorate);
+          const matchesComp = !localFilter.compartment || localFilter.compartment.length === 0 || localFilter.compartment.includes(item.kompartemen);
+          const matchesDept = !localFilter.department || localFilter.department.length === 0 || localFilter.department.includes(item.unitKerja);
           const matchesGrade = !localFilter.grades || localFilter.grades.length === 0 || localFilter.grades.includes(item.grade);
           
-          return matchesDir && matchesComp && matchesDept && matchesGrade;
+          // New Risk Level Filter
+          const score = item.residual.l * item.residual.c;
+          const level = getLevelLabel(score);
+          const matchesLevel = !localFilter.level || localFilter.level.length === 0 || localFilter.level.includes(level);
+          
+          return matchesDir && matchesComp && matchesDept && matchesGrade && matchesLevel;
       });
   };
 
   // --- FILTERING LOGIC (GLOBAL CONTEXT) ---
   const risksList = useMemo(() => {
       return rawData.filter(item => {
-          // 1. Basic Filters (Type & Period Only - Unit is now Local)
+          // 1. Basic Filters
           const matchesJenis = item.jenisRisiko === filters.jenis;
-          
           const matchesPeriode = filters.periode === 'Semua Periode' || item.periode.includes(filters.periode) || filters.periode.includes('Y1') || filters.periode.includes('Y2'); 
-          
-          // Legacy Unit Filter Support (Optional, can be removed if strictly local)
           const matchesUnit = filters.unit === 'Semua Unit Kerja' || item.unitKerja === filters.unit;
           
-          // 2. RBAC Logic
-          let hasAccess = false;
+          if (!matchesJenis || !matchesPeriode || !matchesUnit) return false;
+
+          // 2. RBAC & Data Scoping Logic
           const userRoles = currentUser.roles || ['Superadmin'];
+          const jabatan = currentUser.jabatan || '';
+
+          // If Superadmin or Admin MRK -> Access All (Subject to filters)
           if (userRoles.includes('Superadmin') || userRoles.includes('Admin MRK')) {
-              hasAccess = true;
-          } else if (userRoles.includes('Karyawan')) {
-              hasAccess = item.owner === currentUser.id;
-          } else if (userRoles.includes('Viewer')) {
-              hasAccess = true; 
+              return true;
           }
 
-          return matchesJenis && matchesPeriode && matchesUnit && hasAccess;
+          // Karyawan (and Atasan logic) & Admin Data
+          // "jika jabatannya adalah atasan AVP jumlah yang muncul adalah total risiko di unit kerja mereka"
+          // "jika jabatannya adalah VP juga sama dengan AVP"
+          // "jika jabatannya SVP maka list departemennya adalah departemen di bawah kompartemen (SVP) tersebut"
+          // "Jika rolenya Karyawan [Biasa] maka akan tampil jumlah risiko pribadi milik mereka sendiri"
+          
+          if (userRoles.includes('Karyawan') || userRoles.includes('Admin Data')) {
+             if (jabatan.includes('SVP')) {
+                 // Access entire kompartemen
+                 return item.kompartemen === currentUser.kompartemen;
+             } else if (jabatan.includes('VP') || jabatan.includes('AVP') || jabatan.includes('PM')) {
+                 // Access entire unit kerja
+                 return item.unitKerja === currentUser.unit;
+             } else {
+                 // Regular Staff -> Own risks only
+                 return item.owner === currentUser.id;
+             }
+          }
+
+          if (userRoles.includes('Viewer')) {
+              return true; 
+          }
+
+          return false;
       });
   }, [rawData, filters.jenis, filters.periode, filters.unit, currentUser]);
 
@@ -846,13 +910,22 @@ const App = () => {
                 
                 {/* Department Selector */}
                 <div className="w-full mt-4 relative">
-                   <select className="w-full text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 outline-none appearance-none cursor-pointer hover:border-blue-300 transition-colors text-center truncate pr-8">
-                       <option>PIC SISMEN - Departemen Lingkungan Hidup</option>
-                       <option>Karyawan - Staff Operasional</option>
-                       <option>AVP - Area 1</option>
-                       <option>VP - Operasi</option>
-                       <option>SVP - Teknik</option>
-                       <option>PM - Proyek Soda Ash</option>
+                   <select 
+                       className="w-full text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 outline-none appearance-none cursor-pointer hover:border-blue-300 transition-colors text-center truncate pr-8"
+                       onChange={(e) => {
+                           const val = e.target.value;
+                           const parts = val.split(' - ');
+                           const title = parts[0];
+                           const unit = parts[1] || '';
+                           setCurrentUser(prev => ({...prev, jabatan: title, unit: unit || prev.unit}));
+                       }}
+                   >
+                       <option value="PIC SISMEN - Departemen Lingkungan Hidup">PIC SISMEN - Departemen Lingkungan Hidup</option>
+                       <option value="Karyawan - Staff Operasional">Karyawan - Staff Operasional</option>
+                       <option value="AVP - Departemen K3">AVP - Departemen K3</option>
+                       <option value="VP - Departemen Operasi">VP - Departemen Operasi</option>
+                       <option value="SVP - Kompartemen Teknik">SVP - Kompartemen Teknik</option>
+                       <option value="PM - Proyek Soda Ash">PM - Proyek Soda Ash</option>
                    </select>
                    <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
@@ -963,7 +1036,7 @@ const App = () => {
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 
                 {/* 1. ADVANCED FILTER SECTION */}
-                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-5 items-end">
+                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
                     <div className="relative">
                         <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
                             <Layers size={12} /> Jenis Pengelolaan Risiko
@@ -1023,15 +1096,35 @@ const App = () => {
                         </select>
                         <ChevronDown size={14} className="absolute right-3 bottom-3.5 text-slate-400 pointer-events-none" />
                     </div>
+
+                    <div className="relative">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                            <Users size={12} /> Unit Kerja
+                            <InfoTooltip text="Filter berdasarkan unit kerja pemilik risiko." />
+                        </label>
+                        <select 
+                            value={filters.unit}
+                            onChange={(e) => setFilters({...filters, unit: e.target.value})}
+                            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
+                        >
+                            <option value="Semua Unit Kerja">Semua Unit Kerja</option>
+                            {['Departemen K3', 'Departemen Lingkungan Hidup', 'Departemen Operasi', 'Departemen HR', 'Departemen Keuangan', 'Departemen IT'].map(u => (
+                                <option key={u} value={u}>{u}</option>
+                            ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 bottom-3.5 text-slate-400 pointer-events-none" />
+                    </div>
                 </div>
 
                 {/* 2. SUMMARY STATISTICS */}
                 <div className="space-y-4">
                      {/* Local Filter for Stats */}
-                     <HierarchicalFilter 
-                        title="Filter Statistik Status Status"
-                        onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, status: f }))} 
-                     />
+                     {showFilters && (
+                        <HierarchicalFilter 
+                            title="Filter Statistik Status Status"
+                            onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, status: f }))} 
+                        />
+                     )}
                     
                     {/* Row 1: Totals */}
                     <div className="grid grid-cols-2 gap-4">
@@ -1058,7 +1151,7 @@ const App = () => {
                     </div>
 
                     {/* Row 2: Register Statuses */}
-                    <div className="overflow-x-auto pb-2">
+                    <div>
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center">
                             Register Risk Status
                             <InfoTooltip text="Status dokumen pendaftaran risiko baru. Mulai dari Draft hingga berbagai tahapan approval." />
@@ -1073,7 +1166,7 @@ const App = () => {
                                 { l: 'Menunggu Approval SVP TKMR', c: statusRisks.filter(r => r.status === 'Menunggu Approval SVP TKMR').length, color: 'bg-orange-50 text-orange-600' },
                                 { l: 'Baru', c: statusRisks.filter(r => r.status === 'Baru').length, color: 'bg-blue-50 text-blue-600' },
                             ].map((stat, i) => (
-                                <div key={i} onClick={() => handleStatusClick(stat.l)} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/10 transition-all flex flex-col items-center min-w-[140px] cursor-pointer group hover:shadow-sm relative w-full`}>
+                                <div key={i} onClick={() => handleStatusClick(stat.l)} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/10 transition-all flex flex-col items-center cursor-pointer group hover:shadow-sm relative w-full`}>
                                     <span className="text-2xl font-black mb-1">{stat.c}</span>
                                     <span className="text-[9px] font-bold text-center uppercase leading-tight opacity-80 line-clamp-2">{stat.l}</span>
                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1085,7 +1178,7 @@ const App = () => {
                     </div>
 
                     {/* Row 3: Monitoring Statuses */}
-                    <div className="overflow-x-auto pb-2">
+                    <div>
                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center">
                              Monitoring Risk Status
                              <InfoTooltip text="Status dokumen pemantauan (monitoring) risiko berkala." />
@@ -1101,7 +1194,7 @@ const App = () => {
                                 { l: 'Menunggu Approval Monitoring SVP TKMR', c: statusRisks.filter(r => r.status === 'Menunggu Approval Monitoring SVP TKMR').length, color: 'bg-amber-50 text-amber-600' },
                                 { l: 'Selesai Monitoring', c: statusRisks.filter(r => r.status === 'Selesai Monitoring').length, color: 'bg-blue-50 text-blue-600' },
                             ].map((stat, i) => (
-                                <div key={i} onClick={() => handleStatusClick(stat.l)} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/10 transition-all flex flex-col items-center min-w-[140px] cursor-pointer group hover:shadow-sm relative w-full`}>
+                                <div key={i} onClick={() => handleStatusClick(stat.l)} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/10 transition-all flex flex-col items-center cursor-pointer group hover:shadow-sm relative w-full`}>
                                     <span className="text-2xl font-black mb-1">{stat.c}</span>
                                     <span className="text-[9px] font-bold text-center uppercase leading-tight opacity-80 line-clamp-2">{stat.l}</span>
                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1138,10 +1231,12 @@ const App = () => {
                         </div>
                     </div>
                     
-                    <HierarchicalFilter 
-                        title="Filter Grafik"
-                        onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, chart: f }))} 
-                    />
+                    {showFilters && (
+                        <HierarchicalFilter 
+                            title="Filter Grafik"
+                            onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, chart: f }))} 
+                        />
+                    )}
 
                     <div className="h-[350px] w-full">
                          <ResponsiveContainer width="100%" height="100%">
@@ -1175,10 +1270,12 @@ const App = () => {
                         </h3>
                     </div>
                     
-                    <HierarchicalFilter 
-                        title="Filter Peta Risiko"
-                        onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, map: f }))} 
-                    />
+                    {showFilters && (
+                        <HierarchicalFilter 
+                            title="Filter Peta Risiko"
+                            onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, map: f }))} 
+                        />
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 h-[400px]">
                         <RiskMatrix title="Inherent" type="inherent" data={mapRisks} />
@@ -1197,27 +1294,29 @@ const App = () => {
                                Statistik Kelengkapan
                             </h3>
                          </div>
-                         <HierarchicalFilter 
-                            title="Filter Kelengkapan"
-                            onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, stats: f }))} 
-                         />
+                         {showFilters && (
+                            <HierarchicalFilter 
+                                title="Filter Kelengkapan"
+                                onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, stats: f }))} 
+                            />
+                         )}
                          
                          <div className="space-y-6 mt-4">
                             {/* 1. Kelengkapan Jumlah Risiko */}
                             <div>
-                                <h4 className="text-xs font-bold text-slate-600 mb-2">Kelengkapan Jumlah Risiko</h4>
-                                {['Departemen K3', 'Departemen Lingkungan Hidup', 'Departemen Operasi'].map((dept, i) => {
-                                    const total = 50; // Mock target
+                                <h4 className="text-xs font-bold text-slate-600 mb-2">Jumlah Risiko</h4>
+                                {[...new Set(statsRisks.map(r => r.unitKerja))].slice(0, 8).map((dept, i) => {
+                                    const total = 50; // Mock target, ideally this should be dynamic or fixed per dept
                                     const filled = statsRisks.filter(r => r.unitKerja === dept).length;
-                                    const pct = Math.min(100, Math.round((filled / total) * 100));
+                                    const pct = Math.min(100, Math.round((filled / total) * 100)); // Just for demo viz
                                     return (
                                         <div key={i} className="mb-2">
                                             <div className="flex justify-between text-[10px] mb-1">
                                                 <span>{dept}</span>
-                                                <span className="font-bold">{pct}% ({filled}/{total})</span>
+                                                <span className="font-bold">{filled} Risiko</span>
                                             </div>
                                             <div className="h-1.5 w-full bg-slate-100 rounded-full">
-                                                <div className="h-full bg-blue-500 rounded-full" style={{width: `${pct}%`}}></div>
+                                                <div className="h-full bg-blue-500 rounded-full" style={{width: `${Math.min(100, filled)}%`}}></div>
                                             </div>
                                         </div>
                                     )
@@ -1227,8 +1326,7 @@ const App = () => {
                             {/* 2. Persentase Pengisi (Employee) */}
                              <div>
                                 <h4 className="text-xs font-bold text-slate-600 mb-2">Partisipasi Karyawan (Pengisi)</h4>
-                                {/* Mock Data */}
-                                {['Departemen K3', 'Departemen HR'].map((dept, i) => (
+                                {[...new Set(statsRisks.map(r => r.unitKerja))].slice(0, 5).map((dept, i) => (
                                     <div key={i} className="mb-2">
                                         <div className="flex justify-between text-[10px] mb-1">
                                             <span>{dept}</span>
@@ -1244,7 +1342,7 @@ const App = () => {
                             {/* 3. Kelengkapan Monitoring */}
                              <div>
                                 <h4 className="text-xs font-bold text-slate-600 mb-2">Kelengkapan Monitoring</h4>
-                                {['Departemen K3', 'Departemen Lingkungan Hidup'].map((dept, i) => {
+                                {[...new Set(statsRisks.map(r => r.unitKerja))].slice(0, 8).map((dept, i) => {
                                      const count = statsRisks.filter(r => r.unitKerja === dept && r.status === 'Berjalan').length;
                                      return (
                                         <div key={i} className="flex justify-between items-center text-[10px] py-1 border-b border-slate-50">
@@ -1265,10 +1363,12 @@ const App = () => {
                                Rekapitulasi Key Risk Indicator (KRI)
                             </h3>
                          </div>
-                         <HierarchicalFilter 
-                            title="Filter KRI"
-                            onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, kri: f }))} 
-                         />
+                         {showFilters && (
+                             <HierarchicalFilter 
+                                title="Filter KRI"
+                                onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, kri: f }))} 
+                             />
+                         )}
                          
                          <div className="overflow-x-auto mt-4">
                             <table className="w-full text-left border-collapse">
@@ -1278,7 +1378,13 @@ const App = () => {
                                         <th className="p-2 border-b">Satuan</th>
                                         <th className="p-2 border-b">Periode</th>
                                         <th className="p-2 border-b">Realisasi</th>
-                                        <th className="p-2 border-b">Kriteria</th>
+                                        <th className="p-2 border-b text-center" colSpan="3">Threshold</th>
+                                    </tr>
+                                    <tr className="bg-slate-100 text-[9px] text-slate-400">
+                                        <th colSpan="4"></th>
+                                        <th className="p-1 border-b text-center text-emerald-600">Aman</th>
+                                        <th className="p-1 border-b text-center text-yellow-600">Waspada</th>
+                                        <th className="p-1 border-b text-center text-red-600">Bahaya</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-xs">
@@ -1288,14 +1394,9 @@ const App = () => {
                                             <td className="p-2 text-slate-400">%</td>
                                             <td className="p-2">{r.periode}</td>
                                             <td className="p-2 font-bold">{Math.floor(Math.random() * 100)}</td>
-                                            <td className="p-2">
-                                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                                                    i % 3 === 0 ? 'bg-green-100 text-green-700' : 
-                                                    i % 3 === 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                                                }`}>
-                                                    {i % 3 === 0 ? 'AMAN' : i % 3 === 1 ? 'WASPADA' : 'BAHAYA'}
-                                                </span>
-                                            </td>
+                                            <td className="p-2 text-center text-[9px] font-mono">{`< 80`}</td>
+                                            <td className="p-2 text-center text-[9px] font-mono">80 - 95</td>
+                                            <td className="p-2 text-center text-[9px] font-mono">{`> 95`}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -1313,10 +1414,12 @@ const App = () => {
                               Rekapitulasi Risiko
                               <InfoTooltip text="Daftar risiko yang sesuai dengan kriteria filter." />
                            </h3>
-                           <HierarchicalFilter 
-                                title="Filter Tabel"
-                                onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, table: f }))} 
-                           />
+                           {showFilters && (
+                                <HierarchicalFilter 
+                                        title="Filter Tabel"
+                                        onFilterChange={(f) => setSectionFilters(prev => ({ ...prev, table: f }))} 
+                                />
+                           )}
                        </div>
                        <button onClick={handleMonitoringExport} className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors border border-blue-100 flex items-center gap-2 mt-2">
                           <Download size={14} /> Export CSV
@@ -1375,7 +1478,7 @@ const App = () => {
                                    {/* TARGET */}
                                    <th colSpan="3" className="p-1 text-center bg-emerald-900 border-r border-slate-700">Target</th>
                                </tr>
-                               {/* SUB HEADER L, C, S */}
+                               {/* SUB HEADER L, C, S => L, C, Level */}
                                <tr className="bg-slate-800 text-white text-[9px]">
                                    <th className="sticky left-0 bg-slate-800 z-30"></th>
                                    <th className="sticky left-[100px] bg-slate-800 z-30"></th>
@@ -1383,14 +1486,14 @@ const App = () => {
                                    
                                    <th className="text-center w-8 bg-blue-900/50">L</th>
                                    <th className="text-center w-8 bg-blue-900/50">C</th>
-                                   <th className="text-center w-8 bg-blue-900/50">S</th>
+                                   <th className="text-center min-w-[50px] bg-blue-900/50">Level</th>
 
                                    {filters.jenis === 'OPERASIONAL' ? (
                                         [1,2,3,4].map(q => (
                                             <React.Fragment key={q}>
                                                 <th className="text-center w-8 bg-slate-700/50 border-l border-slate-600">L</th>
                                                 <th className="text-center w-8 bg-slate-700/50">C</th>
-                                                <th className="text-center w-8 bg-slate-700/50 border-r border-slate-600">S</th>
+                                                <th className="text-center min-w-[50px] bg-slate-700/50 border-r border-slate-600">Level</th>
                                             </React.Fragment>
                                         ))
                                    ) : (
@@ -1398,14 +1501,14 @@ const App = () => {
                                             <React.Fragment key={m}>
                                                 <th className="text-center w-8 bg-slate-700/50 border-l border-slate-600">L</th>
                                                 <th className="text-center w-8 bg-slate-700/50">C</th>
-                                                <th className="text-center w-8 bg-slate-700/50 border-r border-slate-600">S</th>
+                                                <th className="text-center min-w-[50px] bg-slate-700/50 border-r border-slate-600">Level</th>
                                             </React.Fragment>
                                         ))
                                    )}
 
                                    <th className="text-center w-8 bg-emerald-900/50 border-l border-slate-700">L</th>
                                    <th className="text-center w-8 bg-emerald-900/50">C</th>
-                                   <th className="text-center w-8 bg-emerald-900/50">S</th>
+                                   <th className="text-center min-w-[50px] bg-emerald-900/50">Level</th>
                                </tr>
                           </thead>
                           <tbody className="text-xs divide-y divide-slate-100 bg-white">
@@ -1424,7 +1527,7 @@ const App = () => {
                                        {/* Inherent */}
                                        <td className="p-2 text-center bg-blue-50/30 text-[10px] font-bold">{row.inherent.l}</td>
                                        <td className="p-2 text-center bg-blue-50/30 text-[10px] font-bold">{row.inherent.c}</td>
-                                       <td className="p-2 text-center bg-blue-50/30 text-[10px] font-black">{row.inherent.l * row.inherent.c}</td>
+                                       <td className="p-2 text-center bg-blue-50/30 text-[9px] font-bold">{getLevelLabel(row.inherent.l * row.inherent.c)}</td>
 
                                        {/* Monitoring */}
                                        {filters.jenis === 'OPERASIONAL' ? (
@@ -1436,7 +1539,7 @@ const App = () => {
                                                 <React.Fragment key={m}>
                                                     <td className="p-2 text-center border-l border-slate-100 text-[10px]">{d.l}</td>
                                                     <td className="p-2 text-center text-[10px]">{d.c}</td>
-                                                    <td className="p-2 text-center border-r border-slate-100 text-[10px] font-bold">{s}</td>
+                                                    <td className="p-2 text-center border-r border-slate-100 text-[9px] font-bold">{s !== '-' ? getLevelLabel(s) : '-'}</td>
                                                 </React.Fragment>
                                                )
                                            })
@@ -1448,7 +1551,7 @@ const App = () => {
                                                 <React.Fragment key={m}>
                                                     <td className="p-2 text-center border-l border-slate-100 text-[10px]">{d.l}</td>
                                                     <td className="p-2 text-center text-[10px]">{d.c}</td>
-                                                    <td className="p-2 text-center border-r border-slate-100 text-[10px] font-bold">{s}</td>
+                                                    <td className="p-2 text-center border-r border-slate-100 text-[9px] font-bold">{s !== '-' ? getLevelLabel(s) : '-'}</td>
                                                 </React.Fragment>
                                                )
                                            })
@@ -1457,7 +1560,7 @@ const App = () => {
                                        {/* Target */}
                                        <td className="p-2 text-center bg-emerald-50/30 border-l border-slate-100 text-[10px] font-bold">{row.target.l}</td>
                                        <td className="p-2 text-center bg-emerald-50/30 text-[10px] font-bold">{row.target.c}</td>
-                                       <td className="p-2 text-center bg-emerald-50/30 text-[10px] font-black">{row.target.l * row.target.c}</td>
+                                       <td className="p-2 text-center bg-emerald-50/30 text-[9px] font-bold">{getLevelLabel(row.target.l * row.target.c)}</td>
                                    </tr>
                                ))}
                           </tbody>
