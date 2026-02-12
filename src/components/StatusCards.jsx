@@ -4,7 +4,6 @@ import {
   FileText, CheckCircle, Clock, AlertTriangle, XCircle, 
   HelpCircle, Archive, Shield 
 } from 'lucide-react';
-import { Tooltip,TooltipContent, TooltipProvider, TooltipTrigger } from '@radix-ui/react-tooltip'; // Assuming Radix or simple custom tooltip
 
 const StatusCard = ({ title, count, color, icon: Icon, subtext }) => (
   <div className={`p-4 rounded-xl shadow-sm border border-slate-100 bg-white flex flex-col justify-between hover:shadow-md transition-shadow relative group ${subtext ? 'h-32' : 'h-24'}`}>
