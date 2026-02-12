@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Menu, 
   ChevronLeft, 
@@ -27,8 +27,95 @@ import {
   Shield,
   BookOpen,
   Database,
-  ChevronDown
+  ChevronDown,
+  Layers,
+  Activity,
+  CheckCircle,
+  Activity as ActivityIcon
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+
+// --- COMPONENTS ---
+const InfoTooltip = ({ text }) => (
+  <div className="group relative inline-flex items-center ml-1.5 align-middle">
+    <HelpCircle size={14} className="text-slate-400 cursor-help hover:text-blue-500 transition-colors" />
+    <div className="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-800 text-white text-[10px] leading-relaxed rounded-lg shadow-xl z-50 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none text-left font-normal normal-case tracking-normal">
+      {text}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+    </div>
+  </div>
+);
+
+// --- DATA GENERATOR ---
+const generateDummyData = () => {
+    const units = ['Departemen Lingkungan Hidup', 'Departemen K3', 'Departemen Operasi', 'Departemen HR', 'Departemen Keuangan', 'Departemen IT'];
+    const types = ['OPERASIONAL', 'STRATEGIS', 'PROYEK', 'ISO 27001 SMKI'];
+    const statuses = [
+        'Draft', 'Revisi', 'Revisi Monitoring', 
+        'Menunggu Approval VP Unit Kerja', 'Menunggu Approval SVP Unit Kerja', 
+        'Menunggu Approval Staff MRK', 'Menunggu Approval VP MRK', 'Menunggu Approval SVP TKMR',
+        'Menunggu Approval Monitoring VP Unit Kerja', 'Menunggu Approval Monitoring SVP Unit Kerja',
+        'Menunggu Approval Monitoring Staff MRK', 'Menunggu Approval Monitoring VP MRK',
+        'Baru', 'Berjalan', 'Selesai'
+    ];
+    const periods = ['2025', '2026'];
+    const sasaranGenerik = ['Hukum, Reputasi dan Kepatuhan', 'Keuangan', 'Operasional', 'Pasar dan Makroekonomi', 'Proyek', 'Strategis', 'Teknologi dan Keamanan Siber'];
+    
+    // Palet warna untuk risiko
+    const colors = [
+        'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 
+        'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 
+        'bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500'
+    ];
+
+    return Array.from({ length: 200 }, (_, i) => {
+        const type = types[Math.floor(Math.random() * types.length)];
+        const unit = units[Math.floor(Math.random() * units.length)];
+        const status = statuses[Math.floor(Math.random() * statuses.length)];
+        const period = periods[Math.floor(Math.random() * periods.length)];
+        const category = sasaranGenerik[Math.floor(Math.random() * sasaranGenerik.length)];
+        
+        // Generate Scores
+        const inL = Math.ceil(Math.random() * 5);
+        const inC = Math.ceil(Math.random() * 5);
+        const resL = Math.max(1, inL - Math.floor(Math.random() * 3));
+        const resC = Math.max(1, inC - Math.floor(Math.random() * 2));
+        const tarL = Math.max(1, resL - 1);
+        const tarC = Math.max(1, resC - 1);
+
+        // Monitoring Data (Randomized for 12 months)
+        const monitoring = {};
+        ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 'jul', 'agt', 'sep', 'okt', 'nov', 'des'].forEach(m => {
+            if (Math.random() > 0.3) { // 70% chance to have data
+                monitoring[m] = { 
+                    l: Math.max(1, resL - (Math.random() > 0.8 ? 1 : 0)), 
+                    c: Math.max(1, resC - (Math.random() > 0.8 ? 1 : 0)) // Random improvement
+                };
+            }
+        });
+
+        return {
+            id: i + 1,
+            code: `R-${period.substring(2)}.${(i + 1).toString().padStart(3, '0')}`,
+            color: colors[i % colors.length],
+            desc: `Risiko terkait ${type.toLowerCase()} - ${category} pada ${unit} - Isu #${i + 1}`,
+            cause: `Penyebab teknis atau non-teknis yang teridentifikasi pada audit ${period}`,
+            impact: `Dampak potensial terhadap operasional dan finansial sebesar Rp ${(Math.random() * 10).toFixed(1)} M`,
+            status,
+            jenisRisiko: type,
+            kategoriRisiko: category,
+            unitKerja: unit,
+            kompartemen: unit.includes('Operasi') ? 'Kompartemen Operasi' : 'Kompartemen Pendukung',
+            periode: period,
+            owner: `User ${Math.floor(Math.random() * 50) + 1}`, // Simulated Owner ID
+            inherent: { l: inL, c: inC },
+            residual: { l: resL, c: resC },
+            target: { l: tarL, c: tarC },
+            monitoring,
+            biaya: Math.floor(Math.random() * 5000000000) // 0 - 5 M
+        };
+    });
+};
 
 const App = () => {
     const [activeTab, setActiveTab] = useState('Dashboard Admin');
@@ -76,139 +163,76 @@ const App = () => {
     }
   };
 
-  // 2. Data Keaktifan Karyawan (Mock per Role) - DELETED (User Request)
+  // --- DATA & STATE ---
+  const [currentUser, setCurrentUser] = useState({ 
+      id: 'User 1', 
+      role: 'Superadmin', // Options: Superadmin, Karyawan, AVP, VP, SVP, PIC SISMEN
+      name: 'Farhan Jezando', 
+      unit: 'Departemen K3', 
+      kompartemen: 'Kompartemen Operasi',
+      assignedRiskTypes: ['ISO 27001 SMKI'] // For PIC SISMEN
+  });
   
-  // Palet warna unik untuk setiap risiko (1 kode = 1 warna)
-  const uniqueRiskColors = [
-    'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 
-    'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 
-    'bg-cyan-500', 'bg-sky-500', 'bg-blue-500', 'bg-indigo-500', 
-    'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500', 'bg-pink-500'
-  ];
+  const [filters, setFilters] = useState({ 
+      jenis: 'Semua Jenis', 
+      periode: 'Semua Periode', 
+      unit: 'Semua Departemen',
+      chartCategory: 'Sasaran Generik' // For the chart x-axis
+  });
+  
+  const [rawData] = useState(() => generateDummyData());
+    
+  // --- FILTERING LOGIC ---
+  const risksList = useMemo(() => {
+      return rawData.filter(item => {
+          // 1. Basic Filters
+          const matchesJenis = filters.jenis === 'Semua Jenis' || item.jenisRisiko === filters.jenis;
+          const matchesPeriode = filters.periode === 'Semua Periode' || item.periode === filters.periode;
+          const matchesUnit = filters.unit === 'Semua Departemen' || item.unitKerja === filters.unit;
+          
+          // 2. RBAC & Hierarchy Logic
+          let hasAccess = false;
 
-  // --- MOCK DATA RISIKO ---
-  const risksList = useMemo(() => [
-    { 
-      id: 1, 
-      code: 'R-25.001', 
-      color: uniqueRiskColors[0], 
-      inherent: { l: 5, c: 4 }, 
-      residual: { l: 3, c: 3 }, 
-      target: { l: 2, c: 2 }, 
-      desc: 'Gangguan suplai gas alam utama',
-      cause: 'Kerusakan pada pipa penyalur utama akibat korosi atau aktivitas pihak ketiga',
-      impact: 'Terhentinya operasional pabrik secara total selama > 24 jam',
-      status: 'Berjalan'
-    },
-    { 
-      id: 2, 
-      code: 'R-25.002', 
-      color: uniqueRiskColors[1], 
-      inherent: { l: 4, c: 5 }, 
-      residual: { l: 4, c: 4 }, 
-      target: { l: 3, c: 2 }, 
-      desc: 'Kerusakan kompresor turbin unit 1',
-      cause: 'Kelelahan material (fatigue) pada blade turbin',
-      impact: 'Penurunan kapasitas produksi hingga 40%',
-      status: 'Berjalan'
-    },
-    { 
-      id: 3, 
-      code: 'R-25.003', 
-      color: uniqueRiskColors[2], 
-      inherent: { l: 5, c: 5 }, 
-      residual: { l: 2, c: 4 }, 
-      target: { l: 2, c: 1 }, 
-      desc: 'Kecelakaan kerja di area scrubber',
-      cause: 'Kebocoran gas beracun yang tidak terdeteksi sensor',
-      impact: 'Cedera serius atau fatalitas pada pekerja (LTI)',
-      status: 'Revisi'
-    },
-    { 
-      id: 4, 
-      code: 'R-25.004', 
-      color: uniqueRiskColors[3], 
-      inherent: { l: 3, c: 3 }, 
-      residual: { l: 3, c: 2 }, 
-      target: { l: 1, c: 1 }, 
-      desc: 'Keterlambatan sparepart vendor Eropa',
-      cause: 'Gangguan rantai pasok global atau isu geopolitik',
-      impact: 'Perpanjangan durasi downtime maintenance',
-      status: 'Berjalan'
-    },
-    { 
-      id: 5, 
-      code: 'R-25.005', 
-      color: uniqueRiskColors[4], 
-      inherent: { l: 2, c: 4 }, 
-      residual: { l: 2, c: 2 }, 
-      target: { l: 1, c: 2 }, 
-      desc: 'Perubahan regulasi emisi karbon',
-      cause: 'Penerapan pajak karbon baru oleh pemerintah',
-      impact: 'Peningkatan biaya operasional signifikan',
-      status: 'Selesai'
-    },
-    { 
-      id: 6, 
-      code: 'R-25.006', 
-      color: uniqueRiskColors[5], 
-      inherent: { l: 5, c: 4 }, 
-      residual: { l: 3, c: 3 }, 
-      target: { l: 2, c: 2 }, 
-      desc: 'Kebocoran pipa amonia jalur 4',
-      cause: 'Korosi internal pipa yang tidak terpantau',
-      impact: 'Pencemaran lingkungan dan denda regulasi',
-      status: 'Berjalan'
-    },
-    { 
-      id: 7, 
-      code: 'R-25.007', 
-      color: uniqueRiskColors[6], 
-      inherent: { l: 4, c: 2 }, 
-      residual: { l: 2, c: 2 }, 
-      target: { l: 1, c: 1 }, 
-      desc: 'Fluktuasi nilai tukar USD/IDR',
-      cause: 'Ketidakstabilan ekonomi makro global',
-      impact: 'Selisih kurs yang memberatkan budget pengadaan',
-      status: 'Draft'
-    },
-    { 
-      id: 8, 
-      code: 'R-25.008', 
-      color: uniqueRiskColors[7], 
-      inherent: { l: 1, c: 5 }, 
-      residual: { l: 1, c: 3 }, 
-      target: { l: 1, c: 1 }, 
-      desc: 'Serangan siber pada sistem DCS',
-      cause: 'Vulnerability pada sistem jaringan kontrol pabrik',
-      impact: 'Kehilangan kendali operasional pabrik',
-      status: 'Berjalan'
-    },
-    { 
-      id: 9, 
-      code: 'R-25.009', 
-      color: uniqueRiskColors[8], 
-      inherent: { l: 3, c: 5 }, 
-      residual: { l: 2, c: 4 }, 
-      target: { l: 2, c: 2 }, 
-      desc: 'Penurunan kualitas katalis',
-      cause: 'Kontaminasi feed gas yang masuk ke reaktor',
-      impact: 'Penurunan efisiensi konversi reaksi kimia',
-      status: 'Berjalan'
-    },
-    { 
-      id: 10, 
-      code: 'R-25.010', 
-      color: uniqueRiskColors[9], 
-      inherent: { l: 4, c: 4 }, 
-      residual: { l: 3, c: 3 }, 
-      target: { l: 1, c: 2 }, 
-      desc: 'Isu sosial dengan masyarakat sekitar',
-      cause: 'Kurangnya komunikasi program CSR perusahaan',
-      impact: 'Gangguan akses logistik menuju pabrik',
-      status: 'Berjalan'
-    },
-  ], []);
+          if (['Superadmin', 'Admin MRK'].includes(currentUser.role)) {
+              hasAccess = true;
+          } else if (currentUser.role === 'Karyawan') {
+              hasAccess = item.owner === currentUser.id;
+          } else if (currentUser.role === 'AVP') {
+              hasAccess = item.unitKerja === currentUser.unit;
+          } else if (currentUser.role === 'VP') {
+              // VP sees their unit + everything below (Assuming Unit represents the VP's area)
+              hasAccess = item.unitKerja === currentUser.unit; 
+          } else if (currentUser.role === 'SVP') {
+              // SVP sees their Kompartemen
+              hasAccess = item.kompartemen === currentUser.kompartemen;
+          } else if (currentUser.role === 'PIC SISMEN') {
+              hasAccess = currentUser.assignedRiskTypes.includes(item.jenisRisiko);
+          }
+
+          return matchesJenis && matchesPeriode && matchesUnit && hasAccess;
+      });
+  }, [rawData, filters, currentUser]);
+
+  // Data for Charts (Updated for dynamic Category)
+  const chartData = useMemo(() => {
+      // Group by Category (Sasaran Generik, etc)
+      const grouped = {};
+      
+      risksList.forEach(r => {
+          // Use the selected category field. For now simply mapping 'Sasaran Generik' -> 'kategoriRisiko'
+          // In a real app, you might have different fields for 'Aktivitas Generik', etc.
+          const key = r.kategoriRisiko || 'Other'; 
+          
+          if (!grouped[key]) grouped[key] = { name: key, High: 0, Moderate: 0, Low: 0 };
+          
+          const score = r.residual.l * r.residual.c;
+          if (score >= 15) grouped[key].High++;
+          else if (score >= 8) grouped[key].Moderate++; // Changed logic to match standard risk matrix somewhat
+          else grouped[key].Low++;
+      });
+
+      return Object.values(grouped);
+  }, [risksList, filters.chartCategory]);
 
   // --- LOGIC TAMBAHAN DEPENDENT ON RISKS LIST ---
 
@@ -275,22 +299,7 @@ const App = () => {
     });
 
     const rows = risksList.map(r => {
-            // Replicating logic for monitoring
-            const monitoring = {
-               jan: r.inherent,
-               feb: r.residual,
-               mar: r.residual,
-               apr: { l: 3, c: 3 },
-               mei: { l: 2, c: 3 },
-               jun: { l: 2, c: 2 },
-               jul: { l: 2, c: 2 },
-               agt: { l: 1, c: 2 },
-               sep: { l: 1, c: 2 },
-               okt: { l: 1, c: 1 },
-               nov: { l: 1, c: 1 },
-               des: { l: 1, c: 1 }
-            };
-
+            const monitoring = r.monitoring || {};
             let row = [
                 r.code, 
                 `"${r.desc.replace(/"/g, '""')}"`,
@@ -309,8 +318,12 @@ const App = () => {
             // Months
             monthKeys.forEach(m => {
                const d = monitoring[m];
-               const score = d.l * d.c;
-               row.push(d.l, d.c, score, getLevelLabel(score));
+               if (d) {
+                  const score = d.l * d.c;
+                  row.push(d.l, d.c, score, getLevelLabel(score));
+               } else {
+                  row.push('-', '-', '-', '-');
+               }
             });
             
             return row.join(";");
@@ -327,30 +340,11 @@ const App = () => {
     document.body.removeChild(link);
   };
 
-
-
-
   const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   const monthKeys = ['jan', 'feb', 'mar', 'apr', 'mei', 'jun', 'jul', 'agt', 'sep', 'okt', 'nov', 'des'];
 
   // Fill in monitoring data for 2026
-  const tableData = useMemo(() => risksList.map(r => ({
-    ...r,
-    monitoring: {
-      jan: { l: r.inherent.l, c: r.inherent.c },
-      feb: { l: r.residual.l, c: r.residual.c },
-      mar: { l: r.residual.l, c: r.residual.c },
-      apr: { l: 3, c: 3 },
-      mei: { l: 2, c: 3 },
-      jun: { l: 2, c: 2 },
-      jul: { l: 2, c: 2 },
-      agt: { l: 1, c: 2 },
-      sep: { l: 1, c: 2 },
-      okt: { l: 1, c: 1 },
-      nov: { l: 1, c: 1 },
-      des: { l: 1, c: 1 }
-    }
-  })), [risksList]);
+  const tableData = risksList; 
 
   const filteredTable = useMemo(() => {
     let result = [...tableData].filter(item => {
@@ -415,7 +409,8 @@ const App = () => {
   };
 
   // Matrix Component
-  const RiskMatrix = ({ title, type }) => {
+  const RiskMatrix = ({ title, type, data }) => {
+    const list = data || risksList;
     const rows = [5, 4, 3, 2, 1];
     const cols = [1, 2, 3, 4, 5];
 
@@ -428,7 +423,7 @@ const App = () => {
       return 'bg-green-700/10';
     };
 
-    const levelCounts = risksList.reduce((acc, risk) => {
+    const levelCounts = list.reduce((acc, risk) => {
       const coord = risk[type];
       const label = getLevelLabel(coord.l * coord.c);
       acc[label] = (acc[label] || 0) + 1;
@@ -436,7 +431,7 @@ const App = () => {
     }, {});
 
     const handleCellClick = (r, c) => {
-      const risksInCell = risksList.filter(risk => risk[type].l === r && risk[type].c === c);
+      const risksInCell = list.filter(risk => risk[type].l === r && risk[type].c === c);
       if (risksInCell.length > 0) {
         setSelectedCellData({
           title: `Risiko ${title} (Level ${r}x${c})`,
@@ -453,6 +448,7 @@ const App = () => {
           <h3 className="font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide text-sm">
             <AlertTriangle size={18} className="text-blue-600" />
             Peta Risiko {title}
+            <InfoTooltip text={`Matriks distribusi risiko ${title}. Sumbu vertikal = Kemungkinan (Likelihood), Sumbu horizontal = Dampak (Consequence). Klik sel untuk detail.`} />
           </h3>
           <HelpCircle size={16} className="text-slate-300" />
         </div>
@@ -462,7 +458,7 @@ const App = () => {
             <div className="absolute -left-8 top-1/2 -rotate-90 origin-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Likelihood</div>
             <div className="grid grid-cols-5 gap-1 ml-4 border border-slate-200 p-0.5 bg-slate-50">
               {rows.map(r => cols.map(c => {
-                const risksInCell = risksList.filter(risk => risk[type].l === r && risk[type].c === c);
+                const risksInCell = list.filter(risk => risk[type].l === r && risk[type].c === c);
                 const hasRisks = risksInCell.length > 0;
                 return (
                   <div 
@@ -470,18 +466,15 @@ const App = () => {
                     onClick={() => hasRisks && handleCellClick(r, c)}
                     className={`h-14 w-full flex flex-wrap gap-1 p-1 items-center justify-center rounded-sm border border-white relative transition-all ${getCellColor(r, c)} ${hasRisks ? 'cursor-pointer hover:brightness-95 hover:scale-105 z-10' : ''}`}
                   >
-                    {risksInCell.map(risk => (
+                    {risksInCell.slice(0, 4).map(risk => (
                       <div 
                         key={risk.id} 
-                        onMouseEnter={() => setHoveredRiskId(risk.id)}
-                        onMouseLeave={() => setHoveredRiskId(null)}
-                        className={`w-3.5 h-3.5 rounded-full ${risk.color} shadow-sm border border-white relative group transition-all duration-300 ${hoveredRiskId === risk.id ? 'ring-2 ring-blue-500 ring-offset-2 scale-150 z-50' : ''}`}
+                        className={`w-3.5 h-3.5 rounded-full ${risk.color} shadow-sm border border-white relative group transition-all duration-300`}
+                        title={risk.code}
                       >
-                         <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[9px] font-black rounded transition-opacity z-50 whitespace-nowrap pointer-events-none ${hoveredRiskId === risk.id ? 'opacity-100' : 'opacity-0'}`}>
-                            {risk.code}
-                         </div>
                       </div>
                     ))}
+                    {risksInCell.length > 4 && <span className="text-[8px] font-black text-slate-500">+{risksInCell.length - 4}</span>}
                   </div>
                 );
               }))}
@@ -489,7 +482,7 @@ const App = () => {
             <div className="text-center mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-4">Consequence</div>
           </div>
         </div>
-
+        
         {/* RINGKASAN JUMLAH RISIKO */}
         <div className="mt-auto border-t pt-4">
            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">Ringkasan Level (Klik untuk Detail):</p>
@@ -607,6 +600,22 @@ const App = () => {
            </div>
            
            <div className="flex items-center gap-4">
+               {/* Role Switcher (Simulasi) */}
+               <div className="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-1 pr-2">
+                   <div className="bg-white shadow-sm border border-slate-100 rounded p-1">
+                       <Shield size={14} className="text-blue-600" />
+                   </div>
+                   <select 
+                       value={currentUser.role}
+                       onChange={(e) => setCurrentUser({...currentUser, role: e.target.value})}
+                       className="bg-transparent text-xs font-bold text-slate-600 outline-none border-none cursor-pointer"
+                   >
+                       <option value="admin">Admin</option>
+                       <option value="risk_officer">Risk Officer</option>
+                       <option value="departemen_head">Dept. Head</option>
+                   </select>
+               </div>
+
                <button onClick={() => setShowNotification(true)} className="p-2.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 rounded-full transition-colors relative">
                  <Bell size={20} />
                  {pendingRisks.length > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>}
@@ -658,129 +667,321 @@ const App = () => {
           {/* Removed sticky tabs to ensure consistency with banner layout */}
   
           {activeTab === 'Dashboard Admin' && (
-             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {/* Dashboard Card Container */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="p-6 border-b border-slate-100">
-                        <h2 className="text-xl font-bold text-slate-800">Dashboard</h2>
+             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                
+                {/* 1. ADVANCED FILTER SECTION */}
+                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
+                    <div className="relative">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                            <Layers size={12} /> Jenis Pengelolaan Risiko
+                            <InfoTooltip text="Filter risiko berdasarkan jenis pengelolaannya (ISO, Operasional, Strategis). Opsi yang muncul disesuaikan dengan hak akses user." />
+                        </label>
+                        <select 
+                            value={filters.jenis} 
+                            onChange={(e) => setFilters({...filters, jenis: e.target.value, periode: 'Semua Periode'})}
+                            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                        >
+                            <option>Semua Jenis</option>
+                            <option>OPERASIONAL</option>
+                            <option>STRATEGIS</option>
+                            <option>PROYEK</option>
+                            <option>ISO 27001 SMKI</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 bottom-3.5 text-slate-400 pointer-events-none" />
                     </div>
                     
-                    <div className="p-6 space-y-8">
-                        {/* Filters Section */}
-                        <div className="bg-[#0055AA] p-4 rounded-lg flex flex-wrap gap-4 items-end">
-                             <div className="flex-1 min-w-[200px]">
-                                <label className="text-xs text-white mb-1 block font-medium">Jenis Pengelolaan Risiko</label>
-                                <div className="relative">
-                                    <select className="w-full bg-white text-slate-700 text-sm font-bold rounded px-3 py-2 outline-none appearance-none cursor-pointer">
-                                        <option>OPERASIONAL</option>
-                                        <option>STRATEGIS</option>
-                                        <option>PROYEK</option>
-                                    </select>
-                                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                                </div>
-                             </div>
-                             <div className="flex-1 min-w-[200px]">
-                                <label className="text-xs text-white mb-1 block font-medium">Periode</label>
-                                <div className="relative">
-                                    <select className="w-full bg-white text-slate-700 text-sm font-bold rounded px-3 py-2 outline-none appearance-none cursor-pointer">
-                                        <option>Semua Periode</option>
-                                        <option>2026</option>
-                                        <option>2025</option>
-                                    </select>
-                                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                                </div>
-                             </div>
-                             <div className="flex-1 min-w-[200px]">
-                                <label className="text-xs text-white mb-1 block font-medium">Departemen</label>
-                                <div className="relative">
-                                    <select className="w-full bg-white text-slate-700 text-sm font-bold rounded px-3 py-2 outline-none appearance-none cursor-pointer">
-                                        <option>Semua Departemen</option>
-                                        <option>Departemen Lingkungan Hidup</option>
-                                        <option>Departemen K3</option>
-                                    </select>
-                                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                                </div>
-                             </div>
+                    <div className="relative">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                            <Calendar size={12} /> Periode
+                            <InfoTooltip text="Filter periode waktu (Tahunan atau Kuartalan). Bergantung pada Jenis Pengelolaan Risiko yang dipilih." />
+                        </label>
+                        <select 
+                            value={filters.periode}
+                            onChange={(e) => setFilters({...filters, periode: e.target.value})}
+                            disabled={filters.jenis === 'Semua Jenis'}
+                            className="w-full bg-slate-50 hover:bg-slate-100 disabled:opacity-60 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                        >
+                            <option>Semua Periode</option>
+                            {filters.jenis === 'OPERASIONAL' ? (
+                                <>
+                                    <option>Q1-2025</option><option>Q2-2025</option><option>Q3-2025</option><option>Q4-2025</option>
+                                    <option>Q1-2026</option><option>Q2-2026</option><option>Q3-2026</option><option>Q4-2026</option>
+                                </>
+                            ) : (
+                                <><option>2025</option><option>2026</option></>
+                            )}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 bottom-3.5 text-slate-400 pointer-events-none" />
+                    </div>
+
+                    <div className="relative">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                            <Users size={12} /> Unit Kerja
+                            <InfoTooltip text="Filter unit kerja atau departemen pemilik risiko." />
+                        </label>
+                        <select 
+                            value={filters.unit}
+                            onChange={(e) => setFilters({...filters, unit: e.target.value})}
+                            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                        >
+                            <option>Semua Departemen</option>
+                            <option>Departemen Lingkungan Hidup</option>
+                            <option>Departemen K3</option>
+                            <option>Departemen Operasi</option>
+                            <option>Departemen HR</option>
+                            <option>Departemen Keuangan</option>
+                            <option>Departemen IT</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 bottom-3.5 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* 2. SUMMARY STATISTICS */}
+                <div className="space-y-4">
+                    {/* Row 1: Totals */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-5 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-between relative overflow-hidden group">
+                           <div>
+                               <p className="text-xs font-medium text-blue-100 mb-1 flex items-center">
+                                   Total Risiko Aktif
+                                   <InfoTooltip text="Jumlah risiko yang masih aktif dan memerlukan mitigasi/pemantauan terus-menerus. Risiko dianggap aktif jika belum berstatus 'Selesai'." />
+                               </p>
+                               <h3 className="text-4xl font-black tracking-tight">{risksList.filter(r => r.status !== 'Selesai').length}</h3>
+                           </div>
+                           <ActivityIcon size={48} className="text-blue-500 opacity-40 absolute right-4 bottom-[-10px] group-hover:scale-110 transition-transform" />
                         </div>
-
-                        {/* Status Stats Row */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                             {[
-                                { label: 'Risiko Baru', count: 5, color: 'bg-[#FF8800]' },
-                                { label: 'Menunggu Persetujuan', count: 243, color: 'bg-[#FF8800]' },
-                                { label: 'Berjalan', count: 97, color: 'bg-[#FF8800]' },
-                                { label: 'Draft', count: 121, color: 'bg-[#FF8800]' },
-                                { label: 'Revisi', count: 9, color: 'bg-[#FF8800]' },
-                                { label: 'Risiko Terintegrasi', count: 0, color: 'bg-[#FF8800]' },
-                             ].map((stat, i) => (
-                                <div key={i} className={`${stat.color} text-white p-4 rounded-lg flex items-center justify-between shadow-md hover:-translate-y-1 transition-transform cursor-pointer`}>
-                                     <span className="text-xs font-bold leading-tight max-w-[80px]">{stat.label}</span>
-                                     <span className="text-3xl font-black">{stat.count}</span>
-                                </div>
-                             ))}
+                        <div className="bg-white border border-slate-200 text-slate-700 p-5 rounded-xl shadow-sm flex items-center justify-between relative overflow-hidden group">
+                           <div>
+                               <p className="text-xs font-bold text-slate-400 mb-1 flex items-center">
+                                   Total Risiko Selesai (Inaktif)
+                                   <InfoTooltip text="Jumlah risiko yang telah ditutup atau selesai dimitigasi (Level Residual sudah mencapai Target)." />
+                               </p>
+                               <h3 className="text-4xl font-black tracking-tight text-slate-800">{risksList.filter(r => r.status === 'Selesai').length}</h3>
+                           </div>
+                           <CheckCircle size={48} className="text-slate-200 absolute right-4 bottom-[-10px] group-hover:scale-110 transition-transform" />
                         </div>
+                    </div>
 
-                        {/* Charts Section */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                             {/* Donut Chart - Status Risiko */}
-                             <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col">
-                                 <h3 className="font-bold text-slate-800 mb-1">Status Risiko (Semua Periode)</h3>
-                                 <p className="text-xs text-slate-400 mb-8">Risiko inaktif adalah risiko dimana level residual sudah sama dengan target.</p>
-                                 
-                                 <div className="flex-grow flex items-center justify-center relative">
-                                      {/* CSS Donut Chart */}
-                                      <div className="w-48 h-48 rounded-full border-[24px] border-[#90C2F6] relative"></div>
-                                      <div className="absolute inset-0 flex items-center justify-center">
-                                          <div className="w-24 h-24 bg-white rounded-full"></div>
-                                      </div>
-                                 </div>
-                                 <div className="flex justify-center gap-4 mt-6">
-                                     <div className="flex items-center gap-2">
-                                          <div className="w-3 h-3 bg-[#90C2F6]"></div>
-                                          <span className="text-xs font-bold text-slate-600">Tidak Aktif <span className="text-slate-400 ml-1">100.0%</span></span>
-                                     </div>
-                                 </div>
-                             </div>
+                    {/* Row 2: Register Statuses */}
+                    <div className="overflow-x-auto pb-2">
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center">
+                            Register Risk Status
+                            <InfoTooltip text="Status dokumen pendaftaran risiko baru. Mulai dari Draft hingga berbagai tahapan approval." />
+                        </h4>
+                        <div className="flex gap-3 min-w-max">
+                            {[
+                                { l: 'Draft', c: risksList.filter(r => r.status === 'Draft').length, color: 'bg-slate-100 text-slate-600' },
+                                { l: 'Revisi', c: risksList.filter(r => r.status === 'Revisi').length, color: 'bg-red-50 text-red-600' },
+                                { l: 'Menunggu Approval VP Unit', c: risksList.filter(r => r.status.includes('Approval VP Unit')).length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Menunggu Approval SVP Unit', c: risksList.filter(r => r.status.includes('Approval SVP Unit')).length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Menunggu Approval Staff MRK', c: risksList.filter(r => r.status.includes('Approval Staff MRK')).length, color: 'bg-orange-50 text-orange-600' },
+                                { l: 'Menunggu Approval VP MRK', c: risksList.filter(r => r.status.includes('Approval VP MRK')).length, color: 'bg-orange-50 text-orange-600' },
+                            ].map((stat, i) => (
+                                <div key={i} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/5 transition-all flex flex-col items-center min-w-[120px]`}>
+                                    <span className="text-2xl font-black mb-1">{stat.c}</span>
+                                    <span className="text-[9px] font-bold text-center uppercase leading-tight opacity-80">{stat.l}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
 
-                             {/* Cost Section */}
-                             <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col">
-                                 <h3 className="font-bold text-slate-800 mb-4">Biaya Mitigasi (Semua Periode)</h3>
-                                 
-                                 <div className="space-y-8">
-                                     <div>
-                                         <p className="text-sm font-bold text-slate-500 mb-1">Rencana Biaya</p>
-                                         <p className="text-3xl font-black text-slate-800">Rp. 3.5 T</p>
-                                         <p className="text-xs text-slate-400 mt-1">(OPEX: Rp 1.9 T | CAPEX: Rp 1.6 T)</p>
-                                     </div>
+                    {/* Row 3: Monitoring Statuses */}
+                    <div className="overflow-x-auto pb-2">
+                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center">
+                             Monitoring Risk Status
+                             <InfoTooltip text="Status dokumen pemantauan (monitoring) risiko berkala." />
+                         </h4>
+                         <div className="flex gap-3 min-w-max">
+                            {[
+                                { l: 'Baru', c: risksList.filter(r => r.status === 'Baru').length, color: 'bg-blue-50 text-blue-600' },
+                                { l: 'Berjalan', c: risksList.filter(r => r.status === 'Berjalan').length, color: 'bg-emerald-50 text-emerald-600' },
+                                { l: 'Revisi Monitoring', c: risksList.filter(r => r.status === 'Revisi Monitoring').length, color: 'bg-red-50 text-red-600' },
+                                { l: 'Menunggu Appr. Mon. VP', c: risksList.filter(r => r.status.includes('Monitoring VP')).length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Appr. Mon. SVP', c: risksList.filter(r => r.status.includes('Monitoring SVP')).length, color: 'bg-amber-50 text-amber-600' },
+                                { l: 'Menunggu Appr. Mon. Staff MRK', c: risksList.filter(r => r.status.includes('Monitoring Staff MRK')).length, color: 'bg-amber-50 text-amber-600' },
+                            ].map((stat, i) => (
+                                <div key={i} className={`${stat.color} px-4 py-3 rounded-lg border border-transparent hover:border-black/5 transition-all flex flex-col items-center min-w-[120px]`}>
+                                    <span className="text-2xl font-black mb-1">{stat.c}</span>
+                                    <span className="text-[9px] font-bold text-center uppercase leading-tight opacity-80">{stat.l}</span>
+                                </div>
+                            ))}
+                         </div>
+                    </div>
+                </div>
 
-                                     <div>
-                                         <p className="text-sm font-bold text-slate-500 mb-1">Realisasi Biaya</p>
-                                         <p className="text-3xl font-black text-slate-800">Rp. 478.4 M</p>
-                                         
-                                         {/* Progress Bar */}
-                                         <div className="mt-4 relative pt-6">
-                                             <div className="flex justify-end mb-1">
-                                                 <span className="text-xs font-bold text-[#4ADE80]">(14%)</span>
-                                             </div>
-                                             <div className="h-4 bg-slate-100 rounded-full overflow-hidden w-full">
-                                                 <div className="h-full bg-[#3B82F6] w-[14%] rounded-full"></div>
-                                             </div>
-                                             <p className="text-xs text-slate-400 mt-2">Persentase realisasi terhadap rencana biaya total.</p>
-                                         </div>
-                                     </div>
-                                 </div>
-                             </div>
+                {/* 3. CHART ANALISIS RISIKO (Based on Image 2) */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div>
+                             <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                                <BarChart3 className="text-blue-600" />
+                                Level Risiko Berdasarkan Kategori
+                                <InfoTooltip text="Grafik distribusi level risiko (High, Moderate, Low) yang dikelompokkan berdasarkan parameter terpilih (Sasaran Generik, Aktivitas Generik, dll)." />
+                             </h3>
+                             <p className="text-xs text-slate-400 mt-1">Distribusi level risiko residual per kategori yang dipilih.</p>
+                        </div>
+                        <div className="flex gap-3">
+                             <select className="text-[10px] font-bold bg-slate-50 border border-slate-200 rounded px-3 py-2 outline-none">
+                                <option>Grade 1-7</option>
+                                <option>Checklist TKO</option>
+                             </select>
+                             <select 
+                                value={filters.chartCategory}
+                                onChange={(e) => setFilters({...filters, chartCategory: e.target.value})}
+                                className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 rounded px-3 py-2 outline-none"
+                             >
+                                <option value="Sasaran Generik">Sasaran Generik</option>
+                                <option value="Aktivitas Generik">Aktivitas Generik</option>
+                                <option value="Risiko Generik">Risiko Generik</option>
+                                <option value="Taksonomi Risiko">Taksonomi Risiko</option>
+                             </select>
+                        </div>
+                    </div>
+                    <div className="h-[350px] w-full">
+                         <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} interval={0} />
+                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
+                                <Tooltip 
+                                    cursor={{fill: '#f8fafc'}} 
+                                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
+                                />
+                                <Legend wrapperStyle={{paddingTop: '20px', fontSize: '12px'}} />
+                                <Bar dataKey="High" name="High Risk" stackId="a" fill="#ef4444" barSize={40} radius={[0, 0, 4, 4]} />
+                                <Bar dataKey="Moderate" name="Moderate Risk" stackId="a" fill="#eab308" barSize={40} />
+                                <Bar dataKey="Low" name="Low Risk" stackId="a" fill="#22c55e" barSize={40} radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                         </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* 4. RISK MAP (Peta Risiko) & PERCENTAGE COMPLETION */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Heatmap (2/3 width) */}
+                    <div className="lg:col-span-2">
+                        <RiskMatrix title="Peta Risiko Residual (Global)" type="residual" data={risksList} />
+                    </div>
+
+                    {/* Completion Stats (1/3 width) */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <PieChart size={18} className="text-blue-600" />
+                            Kelengkapan Pengisian
+                            <InfoTooltip text="Persentase kelengkapan pengisian data risiko per unit kerja/departemen untuk periode aktif." />
+                        </h3>
+                        
+                        <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar max-h-[400px]">
+                            {['Departemen K3', 'Departemen Lingkungan Hidup', 'Departemen Operasi', 'Departemen HR', 'Departemen IT'].map((dept, i) => {
+                                const pct = Math.floor(Math.random() * 40) + 60; // Mock percentage
+                                return (
+                                    <div key={i}>
+                                        <div className="flex justify-between text-xs mb-1">
+                                            <span className="font-bold text-slate-600">{dept}</span>
+                                            <span className={`font-black ${pct < 80 ? 'text-orange-500' : 'text-green-600'}`}>{pct}%</span>
+                                        </div>
+                                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                            <div className={`h-full rounded-full ${pct < 80 ? 'bg-orange-400' : 'bg-green-500'}`} style={{width: `${pct}%`}}></div>
+                                        </div>
+                                        <p className="text-[9px] text-slate-400 mt-1">290 dari 340 Karyawan sudah mengisi</p>
+                                    </div>
+                                )
+                            })}
                         </div>
                     </div>
                 </div>
 
-                {/* Bottom Matrix Placeholder */}
-                <div className="bg-white p-6 rounded-xl border border-slate-200">
-                    <h3 className="text-sm font-bold text-slate-500 mb-4">Peta Risiko</h3>
-                    <div className="h-40 bg-slate-50 flex items-center justify-center text-slate-400 text-sm italic border border-dashed border-slate-300 rounded-lg">
-                        Content Peta Risiko Here
-                    </div>
+                {/* 5. MONITORING TABLE */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                   <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                       <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                          <Layers size={18} className="text-blue-600" />
+                          Rekapitulasi (50 Data Teratas)
+                          <InfoTooltip text="Daftar 50 risiko teratas yang sesuai dengan kriteria filter. Gunakan Export CSV untuk mengunduh data lengkap." />
+                       </h3>
+                       <button onClick={handleMonitoringExport} className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors border border-blue-100 flex items-center gap-2">
+                          <Download size={14} /> Export CSV
+                       </button>
+                   </div>
+                   <div className="overflow-x-auto max-h-[400px]">
+                       <table className="w-full text-left border-collapse">
+                          <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 sticky top-0 z-10">
+                               <tr>
+                                   <th className="p-3 border-b px-4">Kode</th>
+                                   <th className="p-3 border-b w-1/3 min-w-[250px]">Pernyataan Risiko</th>
+                                   <th className="p-3 border-b text-center">Owner</th>
+                                   <th className="p-3 border-b text-center">Inherent</th>
+                                   <th className="p-3 border-b text-center">Residual</th>
+                                   <th className="p-3 border-b text-center">Action</th>
+                               </tr>
+                          </thead>
+                          <tbody className="text-xs divide-y divide-slate-100 bg-white">
+                               {filteredTable.slice(0, 50).map((row, idx) => (
+                                   <tr key={idx} className="hover:bg-slate-50 transition-colors group">
+                                       <td className="p-3 px-4 font-mono font-bold text-blue-600">{row.code}</td>
+                                       <td className="p-3">
+                                           <div className="font-bold text-slate-700 mb-1 line-clamp-2">{row.desc}</div>
+                                           <div className="flex gap-2">
+                                               <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                                    row.status.includes('Draft') ? 'bg-slate-100 text-slate-500' :
+                                                    row.status.includes('Appro') ? 'bg-orange-50 text-orange-600' :
+                                                    'bg-green-50 text-green-600'
+                                                }`}>{row.status}</span>
+                                                <span className="text-[9px] text-slate-400 border border-slate-100 px-1 rounded">{row.unitKerja}</span>
+                                           </div>
+                                       </td>
+                                       <td className="p-3 text-center text-[10px] text-slate-500">
+                                            {row.owner}
+                                       </td>
+                                       <td className="p-3 text-center">
+                                           <div className={`w-6 h-6 rounded flex items-center justify-center mx-auto text-[10px] font-black text-white ${getLevelColorClass(getLevelLabel(row.inherent.l * row.inherent.c)).replace('text-', 'bg-').split(' ')[1]}`}>
+                                               {row.inherent.l * row.inherent.c}
+                                           </div>
+                                       </td>
+                                       <td className="p-3 text-center">
+                                           <div className={`w-6 h-6 rounded flex items-center justify-center mx-auto text-[10px] font-black text-white ${getLevelColorClass(getLevelLabel(row.residual.l * row.residual.c)).replace('text-', 'bg-').split(' ')[1]}`}>
+                                               {row.residual.l * row.residual.c}
+                                           </div>
+                                       </td>
+                                       <td className="p-3 text-center">
+                                           <button className="text-slate-400 hover:text-blue-600 transition-colors"><Settings size={14} /></button>
+                                       </td>
+                                   </tr>
+                               ))}
+                          </tbody>
+                       </table>
+                   </div>
                 </div>
+
+                {/* 6. COST SECTION (Biaya Mitigasi) */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                     <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        <Database size={18} className="text-blue-600" />
+                        Biaya Mitigasi (2025-2026)
+                        <InfoTooltip text="Analisis anggaran biaya mitigasi risiko. Membandingkan Rencana Biaya (OPEX + CAPEX) dengan Realisasi penggunaan anggaran yang berjalan." />
+                     </h3>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                         <div>
+                             <p className="text-sm font-bold text-slate-500 mb-1">Rencana Biaya Total</p>
+                             <p className="text-4xl font-black text-slate-800">Rp 24.5 M</p>
+                             <div className="flex gap-4 mt-2 text-xs text-slate-500">
+                                 <span>OPEX: <span className="font-bold text-slate-700">Rp 14.2 M</span></span>
+                                 <span>CAPEX: <span className="font-bold text-slate-700">Rp 10.3 M</span></span>
+                             </div>
+                         </div>
+                         <div>
+                             <div className="flex justify-between text-xs mb-2">
+                                 <span className="font-bold text-slate-600">Realisasi (YTD)</span>
+                                 <span className="font-bold text-blue-600">32%</span>
+                             </div>
+                             <div className="h-4 bg-slate-100 rounded-full w-full overflow-hidden">
+                                 <div className="h-full bg-blue-600 w-[32%] rounded-full shadow-lg shadow-blue-200"></div>
+                             </div>
+                             <p className="text-[10px] text-slate-400 mt-2 text-right">Rp 7.8 M terealisasi dari total anggaran.</p>
+                         </div>
+                     </div>
+                </div>
+
              </div>
           )}
 
