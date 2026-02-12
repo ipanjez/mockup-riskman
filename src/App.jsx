@@ -568,7 +568,12 @@ const App = () => {
          <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto custom-scrollbar">
             {!sidebarOpen && <div className="p-2 flex justify-center"><User size={20} className="text-slate-400" /></div>}
             
-            <SidebarItem icon={<div className="p-1"><Home size={18} /></div>} label="Dashboard" active={activeTab === 'Dashboard Admin'} onClick={() => setActiveTab('Dashboard Admin')} />
+            <SidebarItem 
+              icon={<div className="p-1"><Home size={18} /></div>} 
+              label="Dashboard" 
+              active={['Dashboard Admin', 'Informasi Dashboard', 'Individu'].includes(activeTab)} 
+              onClick={() => setActiveTab('Dashboard Admin')} 
+            />
             
             <div className={`mt-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ${!sidebarOpen && 'hidden'}`}>MASTER DATA</div>
             <SidebarItem icon={<div className="p-1"><Database size={18} /></div>} label="Master Data" />
