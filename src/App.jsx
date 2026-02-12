@@ -49,17 +49,39 @@ const InfoTooltip = ({ text }) => (
 // --- DATA GENERATOR ---
 const generateDummyData = () => {
     const units = ['Departemen Lingkungan Hidup', 'Departemen K3', 'Departemen Operasi', 'Departemen HR', 'Departemen Keuangan', 'Departemen IT'];
-    const types = ['OPERASIONAL', 'STRATEGIS', 'PROYEK', 'ISO 27001 SMKI'];
-    const statuses = [
-        'Draft', 'Revisi', 'Revisi Monitoring', 
-        'Menunggu Approval VP Unit Kerja', 'Menunggu Approval SVP Unit Kerja', 
-        'Menunggu Approval Staff MRK', 'Menunggu Approval VP MRK', 'Menunggu Approval SVP TKMR',
-        'Menunggu Approval Monitoring VP Unit Kerja', 'Menunggu Approval Monitoring SVP Unit Kerja',
-        'Menunggu Approval Monitoring Staff MRK', 'Menunggu Approval Monitoring VP MRK',
-        'Baru', 'Berjalan', 'Selesai'
+    const types = [
+        'OPERASIONAL', 'STRATEGIS', 'PROYEK', 'INDIVIDU',
+        'PROYEK Soda Ash', 'PROYEK Fak-Fak', 'PROYEK NPK-3',
+        'SM PERPOL7 OBVITNAS', 'SM SIMPRO', 'SM ISO27001 SMKI',
+        'SM ISO26000 CSR', 'SM ISO37001 SMAP', 'SM ISO22301 BCMS', 
+        'SM ISO 45001 & PP 50 SMK3', 'SM ISO 37301 SMK', 'SM ISO 14001 SML'
     ];
+    // Register Risk Statuses
+    const registerStatuses = [
+        'Draft', 
+        'Baru',
+        'Menunggu Approval VP Unit Kerja', 
+        'Menunggu Approval SVP Unit Kerja', 
+        'Menunggu Approval VP MRK', 
+        'Menunggu Approval SVP TKMR'
+    ];
+    // Monitoring Risk Statuses
+    const monitoringStatuses = [
+        'Berjalan', 
+        'Revisi Monitoring', 
+        'Menunggu Approval Monitoring VP Unit Kerja', 
+        'Menunggu Approval Monitoring SVP Unit Kerja',
+        'Menunggu Approval Monitoring Staff MRK', 
+        'Menunggu Approval Monitoring VP MRK', 
+        'Menunggu Approval Monitoring SVP TKMR',
+        'Selesai Monitoring'
+    ];
+
+    const allStatuses = [...registerStatuses, ...monitoringStatuses];
     const periods = ['2025', '2026'];
     const sasaranGenerik = ['Hukum, Reputasi dan Kepatuhan', 'Keuangan', 'Operasional', 'Pasar dan Makroekonomi', 'Proyek', 'Strategis', 'Teknologi dan Keamanan Siber'];
+    const aktivitasGenerik = ['Pengadaan', 'Produksi', 'Distribusi', 'Pemasaran', 'Keuangan', 'SDM', 'IT'];
+    const taksonomiRisiko = ['Risiko Pasar', 'Risiko Kredit', 'Risiko Likuiditas', 'Risiko Operasional', 'Risiko Hukum', 'Risiko Strategis', 'Risiko Reputasi'];
     
     // Palet warna untuk risiko
     const colors = [
@@ -68,10 +90,10 @@ const generateDummyData = () => {
         'bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500'
     ];
 
-    return Array.from({ length: 200 }, (_, i) => {
+    return Array.from({ length: 300 }, (_, i) => {
         const type = types[Math.floor(Math.random() * types.length)];
         const unit = units[Math.floor(Math.random() * units.length)];
-        const status = statuses[Math.floor(Math.random() * statuses.length)];
+        const status = allStatuses[Math.floor(Math.random() * allStatuses.length)];
         const period = periods[Math.floor(Math.random() * periods.length)];
         const category = sasaranGenerik[Math.floor(Math.random() * sasaranGenerik.length)];
         
@@ -103,7 +125,9 @@ const generateDummyData = () => {
             impact: `Dampak potensial terhadap operasional dan finansial sebesar Rp ${(Math.random() * 10).toFixed(1)} M`,
             status,
             jenisRisiko: type,
-            kategoriRisiko: category,
+            kategoriRisiko: category, // Sasaran Generik
+            aktivitasGenerik: aktivitasGenerik[Math.floor(Math.random() * aktivitasGenerik.length)],
+            taksonomiRisiko: taksonomiRisiko[Math.floor(Math.random() * taksonomiRisiko.length)],
             unitKerja: unit,
             kompartemen: unit.includes('Operasi') ? 'Kompartemen Operasi' : 'Kompartemen Pendukung',
             periode: period,
@@ -118,7 +142,10 @@ const generateDummyData = () => {
 };
 
 const App = () => {
-    const [activeTab, setActiveTab] = useState('Dashboard Admin');
+    const [activeTab, setActiveTab] = useState('Dashboard');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // Reduced for demo pagination demonstration
+
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -174,20 +201,44 @@ const App = () => {
   });
   
   const [filters, setFilters] = useState({ 
-      jenis: 'Semua Jenis', 
-      periode: 'Semua Periode', 
+      jenis: 'OPERASIONAL', 
+      periode: '2025', 
       unit: 'Semua Departemen',
-      chartCategory: 'Sasaran Generik' // For the chart x-axis
+      chartCategory: 'Sasaran Generik' 
   });
   
   const [rawData] = useState(() => generateDummyData());
-    
+
+  // Helper to get period options based on Risk Type
+  const getPeriodOptions = (type) => {
+      if (type === 'INDIVIDU') {
+          return ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12'];
+      } else if (type === 'OPERASIONAL') {
+          return ['Q1', 'Q2', 'Q3', 'Q4'];
+      } else {
+          return ['2025', '2026'];
+      }
+  };
+
+  // Helper to get formatted superscripts
+  const formatRiskType = (type) => {
+      if (type.startsWith('PROYEK ')) {
+          const suffix = type.replace('PROYEK ', '');
+          return (<span><sup>PROYEK</sup> {suffix}</span>);
+      }
+      return type;
+  };
+
   // --- FILTERING LOGIC ---
   const risksList = useMemo(() => {
       return rawData.filter(item => {
           // 1. Basic Filters
-          const matchesJenis = filters.jenis === 'Semua Jenis' || item.jenisRisiko === filters.jenis;
-          const matchesPeriode = filters.periode === 'Semua Periode' || item.periode === filters.periode;
+          // Removed 'Semua Jenis' logic as it is no longer an option
+          const matchesJenis = item.jenisRisiko === filters.jenis;
+          
+          // Period logic matching (Simple inclusion for now, can be more complex if needed)
+          const matchesPeriode = filters.periode === 'Semua Periode' || item.periode.includes(filters.periode) || filters.periode === '2025' || filters.periode === '2026'; // Simplified for dummy data
+          
           const matchesUnit = filters.unit === 'Semua Departemen' || item.unitKerja === filters.unit;
           
           // 2. RBAC & Hierarchy Logic
@@ -408,6 +459,51 @@ const App = () => {
      setShowModal(true);
   };
 
+  const handleChartBarClick = (data, pLevel) => {
+      const categoryName = data.name;
+      const categoryType = filters.chartCategory;
+      
+      // Filter the risks
+      const targetRisks = risksList.filter(r => {
+          // Check Category
+          let rCat = '';
+          // Simple mapping based on current dummy data structure
+          if (categoryType === 'Sasaran Generik') rCat = r.kategoriRisiko;
+          else if (categoryType === 'Aktivitas Generik') rCat = r.aktivitasGenerik; 
+          else if (categoryType === 'Taksonomi Risiko') rCat = r.taksonomiRisiko;
+          else rCat = r.kategoriRisiko; // Fallback
+
+          if (rCat !== categoryName) return false;
+          
+          // Check Risk Level
+          const score = r.residual.l * r.residual.c;
+          let level = 'Low';
+          if (score >= 12) level = 'High';      // Adjusted to standard 12+ (Red/High)
+          else if (score >= 5) level = 'Moderate'; // 5-9 usually Moderate/Yellow
+          else level = 'Low'; // 1-4 Green
+          
+          // Note: My dummy data gen uses random scores, this logic needs to match chart data gen logic.
+          // Chart Data Gen Logic was: 
+          // if (score >= 15) grouped[key].High++;
+          // else if (score >= 8) grouped[key].Moderate++;
+          // else grouped[key].Low++;
+          
+          // Let's align them.
+           if (score >= 15) level = 'High';
+           else if (score >= 8) level = 'Moderate';
+           else level = 'Low';
+
+          return level === pLevel;
+      });
+
+      setSelectedCellData({
+          title: `Risiko ${pLevel} - ${categoryName}`,
+          subtitle: `Risiko kategori ${categoryType}: ${categoryName} dengan level ${pLevel}`,
+          risks: targetRisks
+      });
+      setShowModal(true);
+  };
+
   // Matrix Component
   const RiskMatrix = ({ title, type, data }) => {
     const list = data || risksList;
@@ -536,15 +632,44 @@ const App = () => {
                 </div>
                 <h3 className="font-bold text-slate-800 text-sm leading-tight px-2">Farhan Jezando Wardana</h3>
                 <p className="text-[10px] text-slate-400 mt-1">94230665</p>
-                <div className="flex items-center gap-1 mt-2">
-                    <span className="bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">Superadmin</span>
-                    <span className="bg-slate-200 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-full">+4</span>
+                <div className="flex items-center justify-center gap-1 mt-2 w-full">
+                    {/* Role POV Switcher */}
+                    <div className="relative">
+                        <select 
+                            className="bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase outline-none appearance-none cursor-pointer hover:bg-blue-700 text-center pr-4"
+                            value={currentUser.role}
+                            onChange={(e) => setCurrentUser({...currentUser, role: e.target.value})}
+                        >
+                            <option value="Superadmin">Superadmin</option>
+                            <option value="Karyawan">Karyawan</option>
+                            <option value="Admin MRK">Admin MRK</option>
+                            <option value="Admin Data">Admin Data</option>
+                            <option value="Viewer">Viewer</option>
+                        </select>
+                        <ChevronDown size={8} className="absolute right-1 top-1/2 -translate-y-1/2 text-blue-200 pointer-events-none" />
+                    </div>
+                    {/* Mockup Additional Roles Counter */}
+                    <button 
+                        onClick={() => {
+                            const current = parseInt(currentUser.extraRoles || "4");
+                            setCurrentUser({...currentUser, extraRoles: current >= 5 ? "0" : (current + 1).toString()});
+                        }}
+                        className="bg-slate-200 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-full hover:bg-slate-300 transition-colors cursor-pointer select-none"
+                        title="Klik untuk simulasi tambah/hapus role (+1)"
+                    >
+                        +{currentUser.extraRoles || "4"}
+                    </button>
                 </div>
                 
                 {/* Department Selector */}
                 <div className="w-full mt-4 relative">
                    <select className="w-full text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 outline-none appearance-none cursor-pointer hover:border-blue-300 transition-colors text-center truncate pr-8">
                        <option>PIC SISMEN - Departemen Lingkungan Hidup</option>
+                       <option>Karyawan - Staff Operasional</option>
+                       <option>AVP - Area 1</option>
+                       <option>VP - Operasi</option>
+                       <option>SVP - Teknik</option>
+                       <option>PM - Proyek Soda Ash</option>
                    </select>
                    <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
@@ -564,8 +689,8 @@ const App = () => {
             <SidebarItem 
               icon={<div className="p-1"><Home size={18} /></div>} 
               label="Dashboard" 
-              active={['Dashboard Admin', 'Informasi Dashboard', 'Individu'].includes(activeTab)} 
-              onClick={() => setActiveTab('Dashboard Admin')} 
+              active={['Dashboard', 'Informasi Dashboard'].includes(activeTab)} 
+              onClick={() => setActiveTab('Dashboard')} 
             />
             
             <div className={`mt-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ${!sidebarOpen && 'hidden'}`}>MASTER DATA</div>
@@ -600,21 +725,7 @@ const App = () => {
            </div>
            
            <div className="flex items-center gap-4">
-               {/* Role Switcher (Simulasi) */}
-               <div className="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-1 pr-2">
-                   <div className="bg-white shadow-sm border border-slate-100 rounded p-1">
-                       <Shield size={14} className="text-blue-600" />
-                   </div>
-                   <select 
-                       value={currentUser.role}
-                       onChange={(e) => setCurrentUser({...currentUser, role: e.target.value})}
-                       className="bg-transparent text-xs font-bold text-slate-600 outline-none border-none cursor-pointer"
-                   >
-                       <option value="admin">Admin</option>
-                       <option value="risk_officer">Risk Officer</option>
-                       <option value="departemen_head">Dept. Head</option>
-                   </select>
-               </div>
+               {/* Role Switcher Removed as per request */}
 
                <button onClick={() => setShowNotification(true)} className="p-2.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 rounded-full transition-colors relative">
                  <Bell size={20} />
@@ -636,7 +747,7 @@ const App = () => {
         <main className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
           
           {/* Top Banner (Only on General Dashboard) */}
-          {activeTab === 'Dashboard Admin' && (
+          {activeTab === 'Dashboard' && (
              <div className="bg-gradient-to-r from-[#0055AA] to-[#0077EE] rounded-2xl p-6 mb-6 text-white relative overflow-hidden shadow-xl shadow-blue-900/10 flex items-center justify-between min-h-[160px]">
                  {/* Text Content */}
                  <div className="relative z-10 pl-2">
@@ -644,9 +755,8 @@ const App = () => {
                      <p className="text-blue-100 text-sm font-medium opacity-90 max-w-xl">Aplikasi Sistem Manajemen Risiko Terintegrasi</p>
                      
                      <div className="flex gap-6 mt-8">
-                         <button className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'Dashboard Admin' ? 'border-white text-white' : 'border-transparent text-blue-200 hover:text-white'}`}>Dashboard Admin</button>
-                         <button onClick={() => setActiveTab('Informasi Dashboard')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Informasi Dashboard</button>
-                         <button onClick={() => setActiveTab('Individu')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Individu</button>
+                         <button onClick={() => setActiveTab('Dashboard')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'Dashboard' ? 'border-white text-white' : 'border-transparent text-blue-200 hover:text-white'}`}>Dashboard</button>
+                         <button onClick={() => setActiveTab('Informasi Dashboard')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'Informasi Dashboard' ? 'border-white text-white' : 'border-transparent text-blue-200 hover:text-white'}`}>Informasi Dashboard</button>
                      </div>
                  </div>
 
@@ -666,7 +776,7 @@ const App = () => {
           {/* Tabs */}
           {/* Removed sticky tabs to ensure consistency with banner layout */}
   
-          {activeTab === 'Dashboard Admin' && (
+          {activeTab === 'Dashboard' && (
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 
                 {/* 1. ADVANCED FILTER SECTION */}
@@ -674,18 +784,42 @@ const App = () => {
                     <div className="relative">
                         <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
                             <Layers size={12} /> Jenis Pengelolaan Risiko
-                            <InfoTooltip text="Filter risiko berdasarkan jenis pengelolaannya (ISO, Operasional, Strategis). Opsi yang muncul disesuaikan dengan hak akses user." />
+                            <InfoTooltip text="Filter risiko berdasarkan jenis pengelolaannya. Wajib dipilih." />
                         </label>
                         <select 
                             value={filters.jenis} 
-                            onChange={(e) => setFilters({...filters, jenis: e.target.value, periode: 'Semua Periode'})}
-                            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                            onChange={(e) => {
+                                const newType = e.target.value;
+                                const newPeriodOptions = getPeriodOptions(newType);
+                                setFilters({
+                                    ...filters, 
+                                    jenis: newType, 
+                                    periode: newPeriodOptions[0] // Reset period to first available option
+                                });
+                            }}
+                            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
                         >
-                            <option>Semua Jenis</option>
-                            <option>OPERASIONAL</option>
-                            <option>STRATEGIS</option>
-                            <option>PROYEK</option>
-                            <option>ISO 27001 SMKI</option>
+                            <option value="OPERASIONAL">OPERASIONAL</option>
+                            <option value="STRATEGIS">STRATEGIS</option>
+                            <option value="INDIVIDU">INDIVIDU</option>
+                            
+                            <optgroup label="Proyek">
+                                <option value="PROYEK Soda Ash">ᵖʳᵒʸᵉᵏ Soda Ash</option>
+                                <option value="PROYEK Fak-Fak">ᵖʳᵒʸᵉᵏ Fak-Fak</option>
+                                <option value="PROYEK NPK-3">ᵖʳᵒʸᵉᵏ NPK-3</option>
+                            </optgroup>
+
+                            <optgroup label="Sistem Manajemen (ISO)">
+                                <option value="SM PERPOL7 OBVITNAS">SM PERPOL7 OBVITNAS</option>
+                                <option value="SM SIMPRO">SM SIMPRO</option>
+                                <option value="SM ISO27001 SMKI">SM ISO27001 SMKI</option>
+                                <option value="SM ISO26000 CSR">SM ISO26000 CSR</option>
+                                <option value="SM ISO37001 SMAP">SM ISO37001 SMAP</option>
+                                <option value="SM ISO22301 BCMS">SM ISO22301 BCMS</option>
+                                <option value="SM ISO 45001 & PP 50 SMK3">SM ISO 45001 & PP 50 SMK3</option>
+                                <option value="SM ISO 37301 SMK">SM ISO 37301 SMK</option>
+                                <option value="SM ISO 14001 SML">SM ISO 14001 SML</option>
+                            </optgroup>
                         </select>
                         <ChevronDown size={14} className="absolute right-3 bottom-3.5 text-slate-400 pointer-events-none" />
                     </div>
@@ -693,23 +827,16 @@ const App = () => {
                     <div className="relative">
                         <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
                             <Calendar size={12} /> Periode
-                            <InfoTooltip text="Filter periode waktu (Tahunan atau Kuartalan). Bergantung pada Jenis Pengelolaan Risiko yang dipilih." />
+                            <InfoTooltip text="Periode waktu laporan risiko." />
                         </label>
                         <select 
                             value={filters.periode}
                             onChange={(e) => setFilters({...filters, periode: e.target.value})}
-                            disabled={filters.jenis === 'Semua Jenis'}
-                            className="w-full bg-slate-50 hover:bg-slate-100 disabled:opacity-60 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
                         >
-                            <option>Semua Periode</option>
-                            {filters.jenis === 'OPERASIONAL' ? (
-                                <>
-                                    <option>Q1-2025</option><option>Q2-2025</option><option>Q3-2025</option><option>Q4-2025</option>
-                                    <option>Q1-2026</option><option>Q2-2026</option><option>Q3-2026</option><option>Q4-2026</option>
-                                </>
-                            ) : (
-                                <><option>2025</option><option>2026</option></>
-                            )}
+                            {getPeriodOptions(filters.jenis).map(p => (
+                                <option key={p} value={p}>{p}</option>
+                            ))}
                         </select>
                         <ChevronDown size={14} className="absolute right-3 bottom-3.5 text-slate-400 pointer-events-none" />
                     </div>
@@ -722,7 +849,7 @@ const App = () => {
                         <select 
                             value={filters.unit}
                             onChange={(e) => setFilters({...filters, unit: e.target.value})}
-                            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 px-3 py-3 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
                         >
                             <option>Semua Departemen</option>
                             <option>Departemen Lingkungan Hidup</option>
@@ -848,9 +975,9 @@ const App = () => {
                                     contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
                                 />
                                 <Legend wrapperStyle={{paddingTop: '20px', fontSize: '12px'}} />
-                                <Bar dataKey="High" name="High Risk" stackId="a" fill="#ef4444" barSize={40} radius={[0, 0, 4, 4]} />
-                                <Bar dataKey="Moderate" name="Moderate Risk" stackId="a" fill="#eab308" barSize={40} />
-                                <Bar dataKey="Low" name="Low Risk" stackId="a" fill="#22c55e" barSize={40} radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="High" name="High Risk" stackId="a" fill="#ef4444" barSize={40} onClick={(data) => handleChartBarClick(data, 'High')} className="cursor-pointer hover:opacity-80" />
+                                <Bar dataKey="Moderate" name="Moderate Risk" stackId="a" fill="#eab308" barSize={40} onClick={(data) => handleChartBarClick(data, 'Moderate')} className="cursor-pointer hover:opacity-80" />
+                                <Bar dataKey="Low" name="Low Risk" stackId="a" fill="#22c55e" barSize={40} radius={[4, 4, 0, 0]} onClick={(data) => handleChartBarClick(data, 'Low')} className="cursor-pointer hover:opacity-80" />
                             </BarChart>
                          </ResponsiveContainer>
                     </div>
@@ -896,14 +1023,14 @@ const App = () => {
                    <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
                           <Layers size={18} className="text-blue-600" />
-                          Rekapitulasi (50 Data Teratas)
-                          <InfoTooltip text="Daftar 50 risiko teratas yang sesuai dengan kriteria filter. Gunakan Export CSV untuk mengunduh data lengkap." />
+                          Rekapitulasi Risiko
+                          <InfoTooltip text="Daftar risiko yang sesuai dengan kriteria filter." />
                        </h3>
                        <button onClick={handleMonitoringExport} className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors border border-blue-100 flex items-center gap-2">
                           <Download size={14} /> Export CSV
                        </button>
                    </div>
-                   <div className="overflow-x-auto max-h-[400px]">
+                   <div className="overflow-x-auto min-h-[300px]">
                        <table className="w-full text-left border-collapse">
                           <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 sticky top-0 z-10">
                                <tr>
@@ -912,13 +1039,14 @@ const App = () => {
                                    <th className="p-3 border-b text-center">Owner</th>
                                    <th className="p-3 border-b text-center">Inherent</th>
                                    <th className="p-3 border-b text-center">Residual</th>
-                                   <th className="p-3 border-b text-center">Action</th>
                                </tr>
                           </thead>
                           <tbody className="text-xs divide-y divide-slate-100 bg-white">
-                               {filteredTable.slice(0, 50).map((row, idx) => (
+                               {filteredTable.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((row, idx) => (
                                    <tr key={idx} className="hover:bg-slate-50 transition-colors group">
-                                       <td className="p-3 px-4 font-mono font-bold text-blue-600">{row.code}</td>
+                                       <td className="p-3 px-4 font-mono font-bold text-blue-600">
+                                            <a href="#" className="hover:underline hover:text-blue-800">{row.code}</a>
+                                       </td>
                                        <td className="p-3">
                                            <div className="font-bold text-slate-700 mb-1 line-clamp-2">{row.desc}</div>
                                            <div className="flex gap-2">
@@ -943,13 +1071,34 @@ const App = () => {
                                                {row.residual.l * row.residual.c}
                                            </div>
                                        </td>
-                                       <td className="p-3 text-center">
-                                           <button className="text-slate-400 hover:text-blue-600 transition-colors"><Settings size={14} /></button>
-                                       </td>
                                    </tr>
                                ))}
                           </tbody>
                        </table>
+                   </div>
+                   
+                   {/* Pagination Controls */}
+                   <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-white">
+                        <span className="text-[10px] font-bold text-slate-400">
+                            Show {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredTable.length)} of {filteredTable.length} entries
+                        </span>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => setCurrentPage(curr => Math.max(curr - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50 text-slate-500 border border-transparent hover:border-slate-200 transition-all"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <span className="text-xs font-bold text-slate-600 py-1.5 px-3 bg-slate-50 rounded border border-slate-100">{currentPage}</span>
+                            <button 
+                                onClick={() => setCurrentPage(curr => Math.min(curr + 1, Math.ceil(filteredTable.length / itemsPerPage)))}
+                                disabled={currentPage >= Math.ceil(filteredTable.length / itemsPerPage)}
+                                className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50 text-slate-500 border border-transparent hover:border-slate-200 transition-all"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
                    </div>
                 </div>
 
@@ -1310,13 +1459,7 @@ const App = () => {
              </div>
           )}
 
-          {activeTab === 'Individu' && (
-             <div className="flex flex-col items-center justify-center p-20 text-center">
-                <User size={64} className="text-slate-200 mb-4" />
-                <h3 className="text-xl font-bold text-slate-400">Dashboard Individu</h3>
-                <p className="text-slate-400 mt-2">Halaman khusus untuk melihat risiko yang di-assign kepada Anda.</p>
-             </div>
-          )}
+
 
         </main>
       </div>
