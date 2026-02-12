@@ -649,20 +649,8 @@ const App = () => {
              </div>
           )}
 
-          {/* Individual Tab Only Headers (Since Admin has its own inside banner) */}
-          {activeTab !== 'Dashboard Admin' && (
-            <div className="flex items-center gap-1 border-b-2 border-slate-200 mb-8 w-full sticky top-0 z-0 bg-slate-50/95 backdrop-blur pt-2">
-               {['Dashboard Admin', 'Informasi Dashboard', 'Individu'].map(tab => (
-                  <button 
-                    key={tab} 
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-3 text-xs font-black uppercase tracking-wider relative top-[2px] border-b-2 transition-all ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-300'}`}
-                  >
-                    {tab}
-                  </button>
-               ))}
-            </div>
-          )}
+          {/* Tabs */}
+          {/* Removed sticky tabs to ensure consistency with banner layout */}
   
           {activeTab === 'Dashboard Admin' && (
              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -792,30 +780,68 @@ const App = () => {
           )}
 
           {activeTab === 'Informasi Dashboard' && (
-             <div className="flex flex-col items-center justify-center p-20 text-center">
-                <BarChart3 size={64} className="text-slate-200 mb-4" />
-                <h3 className="text-xl font-bold text-slate-400">Informasi Dashboard</h3>
-                <p className="text-slate-400 mt-2">Menampilkan statistik mendalam mengenai profil risiko perusahaan.</p>
+             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Banner Section - Consistent Structure */}
+                <div className="bg-gradient-to-r from-[#0055AA] to-[#0077EE] rounded-2xl p-6 mb-6 text-white relative overflow-hidden shadow-xl shadow-blue-900/10 flex items-center justify-between min-h-[160px]">
+                     {/* Text Content */}
+                     <div className="relative z-10 pl-2">
+                         <h1 className="text-2xl font-bold mb-2 tracking-tight">Informasi Dashboard</h1>
+                         <p className="text-blue-100 text-sm font-medium opacity-90 max-w-xl">Menampilkan statistik mendalam mengenai profil risiko perusahaan.</p>
+                         
+                         <div className="flex gap-6 mt-8">
+                             <button onClick={() => setActiveTab('Dashboard Admin')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Dashboard Admin</button>
+                             <button className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'Informasi Dashboard' ? 'border-white text-white' : 'border-transparent text-blue-200 hover:text-white'}`}>Informasi Dashboard</button>
+                             <button onClick={() => setActiveTab('Individu')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Individu</button>
+                         </div>
+                     </div>
+    
+                     {/* Mascot Placeholder */}
+                     <div className="relative z-10 hidden lg:block pr-8">
+                          <div className=" p-2 rounded-full">
+                               <BarChart3 size={80} className="text-white drop-shadow-xl fill-white/20" />
+                          </div>
+                     </div>
+                     
+                     {/* Background Pattern */}
+                     <div className="absolute right-0 top-0 h-full w-2/3 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+                 </div>
+
+                 <div className="flex flex-col items-center justify-center p-20 text-center">
+                    <BarChart3 size={64} className="text-slate-200 mb-4" />
+                    <h3 className="text-xl font-bold text-slate-400">Content Informasi Dashboard</h3>
+                    <p className="text-slate-400 mt-2">Konten belum tersedia.</p>
+                 </div>
              </div>
           )}
 
           {activeTab === 'Individu' && (
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                 {/* Welcome Section */}
-                 <div className="bg-gradient-to-r from-blue-700 to-blue-600 text-white p-6 rounded-2xl shadow-xl shadow-blue-900/10 relative overflow-hidden flex items-center justify-between">
-                   <div className="relative z-10 max-w-2xl">
-                     <h2 className="text-2xl font-black mb-2 tracking-tight">Selamat Datang, Administrator!</h2>
-                     <p className="text-blue-100 text-sm font-medium leading-relaxed">Berikut adalah ringkasan status risiko individu Anda secara real-time. Anda memiliki beberapa risiko dengan status <span className="font-bold text-white bg-white/20 px-1 rounded">High</span> yang memerlukan mitigasi segera.</p>
-                   </div>
-                   <div className="hidden lg:block relative z-10 pr-8">
-                       <div className="text-right">
-                          <p className="text-xs font-bold text-blue-200 uppercase tracking-widest mb-1">Total Risiko</p>
-                          <p className="text-4xl font-black">{risksList.length}</p>
-                       </div>
-                   </div>
-                   {/* Background Elements */}
-                   <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-white/10 to-transparent skew-x-12"></div>
-                   <div className="absolute -left-10 -bottom-20 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl"></div>
+                
+                 {/* Banner Section - Consistent Structure */}
+                 <div className="bg-gradient-to-r from-[#0055AA] to-[#0077EE] rounded-2xl p-6 mb-6 text-white relative overflow-hidden shadow-xl shadow-blue-900/10 flex items-center justify-between min-h-[160px]">
+                     {/* Text Content */}
+                     <div className="relative z-10 pl-2">
+                         <h1 className="text-2xl font-bold mb-2 tracking-tight">Selamat Datang, Administrator!</h1>
+                         <p className="text-blue-100 text-sm font-medium opacity-90 max-w-xl">Berikut adalah ringkasan status risiko individu Anda secara real-time. Anda memiliki beberapa risiko dengan status <span className="font-bold text-white bg-white/20 px-1 rounded">High</span> yang memerlukan mitigasi segera.</p>
+                         
+                         <div className="flex gap-6 mt-8">
+                             <button onClick={() => setActiveTab('Dashboard Admin')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Dashboard Admin</button>
+                             <button onClick={() => setActiveTab('Informasi Dashboard')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Informasi Dashboard</button>
+                             <button className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'Individu' ? 'border-white text-white' : 'border-transparent text-blue-200 hover:text-white'}`}>Individu</button>
+                         </div>
+                     </div>
+    
+                     {/* Mascot/Stats Placeholder */}
+                     <div className="relative z-10 hidden lg:block pr-8">
+                           <div className="text-right">
+                              <p className="text-xs font-bold text-blue-200 uppercase tracking-widest mb-1">Total Risiko</p>
+                              <p className="text-5xl font-black drop-shadow-lg">{risksList.length}</p>
+                           </div>
+                     </div>
+                     
+                     {/* Background Pattern */}
+                     <div className="absolute right-0 top-0 h-full w-2/3 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+                     <div className="absolute -left-20 -bottom-40 w-96 h-96 bg-blue-400 rounded-full blur-3xl opacity-20"></div>
                  </div>
   
                  {/* Existing Status Section */}
