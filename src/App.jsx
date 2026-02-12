@@ -39,7 +39,6 @@ const App = () => {
     const formatDate = (d) => d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const formatTime = (d) => d.toLocaleTimeString('id-ID', { hour12: false }).replace(/\./g, ':');
 
-  const [activeTab, setActiveTab] = useState('Dashboard Admin');
   const [selectedCellData, setSelectedCellData] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
