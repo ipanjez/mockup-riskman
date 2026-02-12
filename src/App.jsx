@@ -23,11 +23,22 @@ import {
   Bell,
   FileSpreadsheet,
   User,
-  Users
+  Users,
+  Shield,
+  BookOpen,
+  Database,
+  ChevronDown
 } from 'lucide-react';
 
 const App = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [activeTab, setActiveTab] = useState('Dashboard Admin');
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    React.useEffect(() => { const t = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(t); }, []);
+    const formatDate = (d) => d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const formatTime = (d) => d.toLocaleTimeString('id-ID', { hour12: false }).replace(/\./g, ':');
+
   const [activeTab, setActiveTab] = useState('Dashboard Admin');
   const [selectedCellData, setSelectedCellData] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -510,88 +521,274 @@ const App = () => {
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
       
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-slate-900 text-slate-300 transition-all duration-300 flex flex-col z-20 shadow-xl`}>
-         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-700 bg-slate-900">
+      <aside className={`${sidebarOpen ? 'w-72' : 'w-20'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-20 shadow-xl fixed h-full left-0 top-0 overflow-hidden`}>
+         {/* Sidebar Header */}
+         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 shrink-0">
             {sidebarOpen && (
                <div className="flex items-center gap-2">
-                  <div className="bg-gradient-to-tr from-blue-600 to-cyan-500 p-1.5 rounded-lg">
-                    <LayoutDashboard size={18} className="text-white" />
-                  </div>
-                  <span className="text-lg font-black tracking-tighter text-white italic">RISKMAN</span>
+                  <Shield size={24} className="text-blue-600 fill-blue-600" />
+                  <span className="text-xl font-black text-slate-800 tracking-tighter">RISK<span className="text-blue-600">MAN</span></span>
                </div>
             )}
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white">
-              {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1.5 hover:bg-slate-50 rounded-lg transition-colors text-slate-400 hover:text-blue-600 shrink-0">
+              {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
             </button>
          </div>
-         
-         <nav className="flex-1 py-6 px-3 space-y-2 overflow-y-auto custom-scrollbar">
-            <div className="mb-2 px-3 text-[10px] font-black uppercase text-slate-600 tracking-widest">{sidebarOpen ? 'Menu Utama' : '...'}</div>
-            <SidebarItem icon={<Home size={20} />} label="Dashboard" active={true} />
-            <SidebarItem icon={<FileText size={20} />} label="Risiko Korporat" />
-            <SidebarItem icon={<PieChart size={20} />} label="Laporan & Analisa" />
-            
-            <div className="mt-6 mb-2 px-3 text-[10px] font-black uppercase text-slate-600 tracking-widest">{sidebarOpen ? 'Pengaturan' : '...'}</div>
-            <SidebarItem icon={<Users size={20} />} label="Manajemen User" />
-            <SidebarItem icon={<Settings size={20} />} label="Konfigurasi" />
-         </nav>
-  
-         <div className="p-4 border-t border-slate-800 bg-slate-900">
-            <div className="flex items-center gap-3">
-               <div className="w-10 h-10 min-w-[40px] rounded-full bg-gradient-to-tr from-blue-600 to-cyan-400 border-2 border-slate-700 flex items-center justify-center font-black text-white text-sm shadow-lg">FJ</div>
-               {sidebarOpen && (
-                 <div className="overflow-hidden">
-                   <p className="text-xs font-bold text-white truncate">Farhan Jezando</p>
-                   <p className="text-[10px] text-slate-500 truncate font-bold uppercase">Administrator</p>
-                 </div>
-               )}
+
+         {/* Sidebar User Profile Section (Only visible when open) */}
+         {sidebarOpen && (
+            <div className="p-6 border-b border-slate-100 flex flex-col items-center text-center shrink-0">
+                <div className="w-16 h-16 rounded-full bg-blue-100 border-4 border-white shadow-lg mb-3 flex items-center justify-center overflow-hidden">
+                    {/* Placeholder for Profile Image */}
+                    <User size={32} className="text-blue-600" />
+                </div>
+                <h3 className="font-bold text-slate-800 text-sm leading-tight px-2">Farhan Jezando Wardana</h3>
+                <p className="text-[10px] text-slate-400 mt-1">94230665</p>
+                <div className="flex items-center gap-1 mt-2">
+                    <span className="bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">Superadmin</span>
+                    <span className="bg-slate-200 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-full">+4</span>
+                </div>
+                
+                {/* Department Selector */}
+                <div className="w-full mt-4 relative">
+                   <select className="w-full text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 outline-none appearance-none cursor-pointer hover:border-blue-300 transition-colors text-center truncate pr-8">
+                       <option>PIC SISMEN - Departemen Lingkungan Hidup</option>
+                   </select>
+                   <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
+
+                {/* Clock */}
+                <div className="mt-6 font-mono text-center">
+                    <div className="text-3xl font-black text-slate-800 tracking-tight">{formatTime(currentTime)}</div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{formatDate(currentTime)}</div>
+                </div>
             </div>
-         </div>
+         )}
+         
+         {/* Navigation */}
+         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto custom-scrollbar">
+            {!sidebarOpen && <div className="p-2 flex justify-center"><User size={20} className="text-slate-400" /></div>}
+            
+            <SidebarItem icon={<div className="p-1"><Home size={18} /></div>} label="Dashboard" active={activeTab === 'Dashboard Admin'} onClick={() => setActiveTab('Dashboard Admin')} />
+            
+            <div className={`mt-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ${!sidebarOpen && 'hidden'}`}>MASTER DATA</div>
+            <SidebarItem icon={<div className="p-1"><Database size={18} /></div>} label="Master Data" />
+            
+            <div className={`mt-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ${!sidebarOpen && 'hidden'}`}>USER MANAGEMENT</div>
+            <SidebarItem icon={<div className="p-1"><Users size={18} /></div>} label="User Management" />
+
+            <div className={`mt-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ${!sidebarOpen && 'hidden'}`}>PENGELOLAAN RISIKO</div>
+            <SidebarItem icon={<div className="p-1"><FileText size={18} /></div>} label="Pengelolaan Risiko" />
+            <SidebarItem icon={<div className="p-1"><Shield size={18} /></div>} label="Persetujuan Risiko" />
+            <SidebarItem icon={<div className="p-1"><BarChart3 size={18} /></div>} label="Monitoring Risiko" />
+
+            <div className={`mt-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ${!sidebarOpen && 'hidden'}`}>LAPORAN RISIKO</div>
+            <SidebarItem icon={<div className="p-1"><PieChart size={18} /></div>} label="Rekapitulasi MR" />
+
+            <div className={`mt-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ${!sidebarOpen && 'hidden'}`}>INFORMATION</div>
+            <SidebarItem icon={<div className="p-1"><BookOpen size={18} /></div>} label="Knowledge MR" />
+         </nav>
       </aside>
-  
+
       {/* Main Content Wrapper */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative bg-slate-50">
+      <div className={`flex-1 flex flex-col h-screen overflow-hidden relative bg-slate-50 transition-all duration-300 ${sidebarOpen ? 'ml-72' : 'ml-20'}`}>
         
         {/* Top Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10 sticky top-0 shadow-sm">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10 sticky top-0 shadow-sm shrink-0">
            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-black text-slate-800 tracking-tight uppercase italic text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-cyan-600">Enterprise Risk Management</h1>
+              <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 lg:hidden">
+                 <Menu size={20} />
+              </button>
+              {/* <h1 className="text-xl font-black text-slate-800 tracking-tight uppercase italic text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-cyan-600">Enterprise Risk Management</h1> */}
            </div>
-           <div className="flex items-center gap-3">
-               <div className="hidden md:flex items-center bg-slate-100 rounded-full px-4 py-2 border border-slate-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all w-64">
-                   <Search size={16} className="text-slate-400 mr-2" />
-                   <input type="text" placeholder="Cari risiko, kode..." className="bg-transparent border-none outline-none text-xs font-bold text-slate-700 w-full placeholder:text-slate-400" />
-               </div>
-               <div className="w-px h-8 bg-slate-200 mx-2"></div>
+           
+           <div className="flex items-center gap-4">
                <button onClick={() => setShowNotification(true)} className="p-2.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 rounded-full transition-colors relative">
                  <Bell size={20} />
                  {pendingRisks.length > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>}
                </button>
+               <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+                    <div className="text-right hidden md:block">
+                       <p className="text-sm font-bold text-slate-800">Farhan Jezando Wardana</p>
+                       <p className="text-[10px] text-slate-400 font-medium">94230665</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-white shadow-sm overflow-hidden">
+                        <User size={20} />
+                    </div>
+               </div>
            </div>
         </header>
   
         {/* Main Scrollable Area */}
         <main className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
           
-          {/* Tabs */}
-          <div className="flex items-center gap-1 border-b-2 border-slate-200 mb-8 w-full sticky top-0 z-0 bg-slate-50/95 backdrop-blur pt-2">
-             {['Dashboard Admin', 'Informasi Dashboard', 'Individu'].map(tab => (
-                <button 
-                  key={tab} 
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-6 py-3 text-xs font-black uppercase tracking-wider relative top-[2px] border-b-2 transition-all ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-300'}`}
-                >
-                  {tab}
-                </button>
-             ))}
-          </div>
-  
-          {/* Tab Content */}
+          {/* Top Banner (Only on General Dashboard) */}
           {activeTab === 'Dashboard Admin' && (
-             <div className="flex flex-col items-center justify-center p-20 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <BarChart3 size={64} className="text-slate-200 mb-4" />
-                <h3 className="text-xl font-bold text-slate-400">Dashboard Korporat</h3>
-                <p className="text-slate-400 mt-2">Fitur Dashboard Korporat akan segera tersedia.</p>
+             <div className="bg-gradient-to-r from-[#0055AA] to-[#0077EE] rounded-2xl p-6 mb-6 text-white relative overflow-hidden shadow-xl shadow-blue-900/10 flex items-center justify-between min-h-[160px]">
+                 {/* Text Content */}
+                 <div className="relative z-10 pl-2">
+                     <h1 className="text-2xl font-bold mb-2 tracking-tight">Selamat Datang, Farhan Jezando Wardana</h1>
+                     <p className="text-blue-100 text-sm font-medium opacity-90 max-w-xl">Aplikasi Sistem Manajemen Risiko Terintegrasi</p>
+                     
+                     <div className="flex gap-6 mt-8">
+                         <button className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'Dashboard Admin' ? 'border-white text-white' : 'border-transparent text-blue-200 hover:text-white'}`}>Dashboard Admin</button>
+                         <button onClick={() => setActiveTab('Informasi Dashboard')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Informasi Dashboard</button>
+                         <button onClick={() => setActiveTab('Individu')} className="pb-2 text-sm font-bold border-b-2 border-transparent text-blue-200 hover:text-white transition-colors">Individu</button>
+                     </div>
+                 </div>
+
+                 {/* Mascot Placeholder */}
+                 <div className="relative z-10 hidden lg:block pr-8">
+                      <div className=" p-2 rounded-full">
+                           <Shield size={80} className="text-white drop-shadow-xl fill-white/20" />
+                      </div>
+                 </div>
+                 
+                 {/* Background Pattern */}
+                 <div className="absolute right-0 top-0 h-full w-2/3 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+                 <div className="absolute -left-20 -bottom-40 w-96 h-96 bg-blue-400 rounded-full blur-3xl opacity-20"></div>
+             </div>
+          )}
+
+          {/* Individual Tab Only Headers (Since Admin has its own inside banner) */}
+          {activeTab !== 'Dashboard Admin' && (
+            <div className="flex items-center gap-1 border-b-2 border-slate-200 mb-8 w-full sticky top-0 z-0 bg-slate-50/95 backdrop-blur pt-2">
+               {['Dashboard Admin', 'Informasi Dashboard', 'Individu'].map(tab => (
+                  <button 
+                    key={tab} 
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-6 py-3 text-xs font-black uppercase tracking-wider relative top-[2px] border-b-2 transition-all ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-300'}`}
+                  >
+                    {tab}
+                  </button>
+               ))}
+            </div>
+          )}
+  
+          {activeTab === 'Dashboard Admin' && (
+             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Dashboard Card Container */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-6 border-b border-slate-100">
+                        <h2 className="text-xl font-bold text-slate-800">Dashboard</h2>
+                    </div>
+                    
+                    <div className="p-6 space-y-8">
+                        {/* Filters Section */}
+                        <div className="bg-[#0055AA] p-4 rounded-lg flex flex-wrap gap-4 items-end">
+                             <div className="flex-1 min-w-[200px]">
+                                <label className="text-xs text-white mb-1 block font-medium">Jenis Pengelolaan Risiko</label>
+                                <div className="relative">
+                                    <select className="w-full bg-white text-slate-700 text-sm font-bold rounded px-3 py-2 outline-none appearance-none cursor-pointer">
+                                        <option>OPERASIONAL</option>
+                                        <option>STRATEGIS</option>
+                                        <option>PROYEK</option>
+                                    </select>
+                                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                                </div>
+                             </div>
+                             <div className="flex-1 min-w-[200px]">
+                                <label className="text-xs text-white mb-1 block font-medium">Periode</label>
+                                <div className="relative">
+                                    <select className="w-full bg-white text-slate-700 text-sm font-bold rounded px-3 py-2 outline-none appearance-none cursor-pointer">
+                                        <option>Semua Periode</option>
+                                        <option>2026</option>
+                                        <option>2025</option>
+                                    </select>
+                                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                                </div>
+                             </div>
+                             <div className="flex-1 min-w-[200px]">
+                                <label className="text-xs text-white mb-1 block font-medium">Departemen</label>
+                                <div className="relative">
+                                    <select className="w-full bg-white text-slate-700 text-sm font-bold rounded px-3 py-2 outline-none appearance-none cursor-pointer">
+                                        <option>Semua Departemen</option>
+                                        <option>Departemen Lingkungan Hidup</option>
+                                        <option>Departemen K3</option>
+                                    </select>
+                                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                                </div>
+                             </div>
+                        </div>
+
+                        {/* Status Stats Row */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                             {[
+                                { label: 'Risiko Baru', count: 5, color: 'bg-[#FF8800]' },
+                                { label: 'Menunggu Persetujuan', count: 243, color: 'bg-[#FF8800]' },
+                                { label: 'Berjalan', count: 97, color: 'bg-[#FF8800]' },
+                                { label: 'Draft', count: 121, color: 'bg-[#FF8800]' },
+                                { label: 'Revisi', count: 9, color: 'bg-[#FF8800]' },
+                                { label: 'Risiko Terintegrasi', count: 0, color: 'bg-[#FF8800]' },
+                             ].map((stat, i) => (
+                                <div key={i} className={`${stat.color} text-white p-4 rounded-lg flex items-center justify-between shadow-md hover:-translate-y-1 transition-transform cursor-pointer`}>
+                                     <span className="text-xs font-bold leading-tight max-w-[80px]">{stat.label}</span>
+                                     <span className="text-3xl font-black">{stat.count}</span>
+                                </div>
+                             ))}
+                        </div>
+
+                        {/* Charts Section */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                             {/* Donut Chart - Status Risiko */}
+                             <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col">
+                                 <h3 className="font-bold text-slate-800 mb-1">Status Risiko (Semua Periode)</h3>
+                                 <p className="text-xs text-slate-400 mb-8">Risiko inaktif adalah risiko dimana level residual sudah sama dengan target.</p>
+                                 
+                                 <div className="flex-grow flex items-center justify-center relative">
+                                      {/* CSS Donut Chart */}
+                                      <div className="w-48 h-48 rounded-full border-[24px] border-[#90C2F6] relative"></div>
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                          <div className="w-24 h-24 bg-white rounded-full"></div>
+                                      </div>
+                                 </div>
+                                 <div className="flex justify-center gap-4 mt-6">
+                                     <div className="flex items-center gap-2">
+                                          <div className="w-3 h-3 bg-[#90C2F6]"></div>
+                                          <span className="text-xs font-bold text-slate-600">Tidak Aktif <span className="text-slate-400 ml-1">100.0%</span></span>
+                                     </div>
+                                 </div>
+                             </div>
+
+                             {/* Cost Section */}
+                             <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col">
+                                 <h3 className="font-bold text-slate-800 mb-4">Biaya Mitigasi (Semua Periode)</h3>
+                                 
+                                 <div className="space-y-8">
+                                     <div>
+                                         <p className="text-sm font-bold text-slate-500 mb-1">Rencana Biaya</p>
+                                         <p className="text-3xl font-black text-slate-800">Rp. 3.5 T</p>
+                                         <p className="text-xs text-slate-400 mt-1">(OPEX: Rp 1.9 T | CAPEX: Rp 1.6 T)</p>
+                                     </div>
+
+                                     <div>
+                                         <p className="text-sm font-bold text-slate-500 mb-1">Realisasi Biaya</p>
+                                         <p className="text-3xl font-black text-slate-800">Rp. 478.4 M</p>
+                                         
+                                         {/* Progress Bar */}
+                                         <div className="mt-4 relative pt-6">
+                                             <div className="flex justify-end mb-1">
+                                                 <span className="text-xs font-bold text-[#4ADE80]">(14%)</span>
+                                             </div>
+                                             <div className="h-4 bg-slate-100 rounded-full overflow-hidden w-full">
+                                                 <div className="h-full bg-[#3B82F6] w-[14%] rounded-full"></div>
+                                             </div>
+                                             <p className="text-xs text-slate-400 mt-2">Persentase realisasi terhadap rencana biaya total.</p>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Bottom Matrix Placeholder */}
+                <div className="bg-white p-6 rounded-xl border border-slate-200">
+                    <h3 className="text-sm font-bold text-slate-500 mb-4">Peta Risiko</h3>
+                    <div className="h-40 bg-slate-50 flex items-center justify-center text-slate-400 text-sm italic border border-dashed border-slate-300 rounded-lg">
+                        Content Peta Risiko Here
+                    </div>
+                </div>
              </div>
           )}
 
